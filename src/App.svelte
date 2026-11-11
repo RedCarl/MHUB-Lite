@@ -40,7 +40,7 @@
   function measureNav() {
     const aside = asideEl;
     if (!aside) return;
-    const btn = aside.querySelector<HTMLElement>('button.on');
+    const btn = aside.querySelector<HTMLElement>('.side-nav button.on');
     if (!btn) {
       indShow = false;
       return;
@@ -122,8 +122,6 @@
       : []),
   ]);
 
-  const navOther: NavItem[] = [{ name: 'settings', label: '设置', icon: icons.settings }];
-
   const activeNav = $derived(router.route);
   const info = $derived(activeInfo());
   const battery = $derived(activeBattery());
@@ -201,22 +199,27 @@
           </button>
         {/each}
       {/if}
-      <div class="nav-sep" aria-hidden="true"></div>
-      {#each navOther as n (n.name)}
-        <button class:on={activeNav === n.name} onclick={() => go(n.name)}>
-          <span class="ico"><HugeiconsIcon icon={n.icon} size={ICON_SIZE.control} /></span>
-          {n.label}
-        </button>
-      {/each}
     </nav>
 
     <div class="side-foot">
+      <button
+        class="settings-btn"
+        class:is-active={activeNav === 'settings'}
+        onclick={() => go('settings')}
+        aria-current={activeNav === 'settings' ? 'page' : undefined}
+        title="打开设置"
+      >
+        <span class="ico"><HugeiconsIcon icon={icons.settings} size={ICON_SIZE.control} /></span>
+        <span>设置</span>
+      </button>
+
       <button class="foot" onclick={() => go('overview')} title="查看设备概览">
         <span class="avatar" class:on={online}>
-          <HugeiconsIcon
-            icon={device.active === 'keyboard' ? icons.keyboard : icons.mouse}
-            size={ICON_SIZE.inline}
-          />
+          {#if device.active === 'keyboard'}
+            <HugeiconsIcon icon={icons.keyboard} size={ICON_SIZE.inline} />
+          {:else}
+            <HugeiconsIcon icon={icons.mouse} size={ICON_SIZE.inline} />
+          {/if}
           <i class="avatar-dot" class:on={online} class:saving={device.saveState === 'saving'}></i>
         </span>
         <span class="foot-meta">

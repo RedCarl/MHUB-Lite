@@ -839,6 +839,60 @@ input[type='range']:disabled {
 .side-foot {
   margin-top: auto;
   padding-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* 设置是设备脚注上方的独立按钮，不是导航项：实心玻璃、描边、右侧箭头。 */
+.settings-btn {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 9px;
+  background-color: var(--glass-control);
+  box-shadow:
+    inset 0 1px 0 var(--glass-control-rim),
+    0 0 0 1px var(--glass-edge),
+    0 1px 2px var(--glass-contact);
+  color: var(--fg2);
+  justify-content: center;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: center;
+  transition:
+    background-color 140ms ease-out,
+    color 140ms ease-out,
+    box-shadow 140ms ease-out;
+}
+
+.settings-btn:hover {
+  background-color: var(--hover);
+  color: var(--fg);
+}
+
+.settings-btn.is-active {
+  background-color: color-mix(in oklch, var(--brand) 10%, var(--glass-control));
+  box-shadow:
+    inset 0 1px 0 var(--glass-control-rim),
+    0 0 0 1px color-mix(in oklch, var(--brand) 38%, transparent),
+    0 1px 2px var(--glass-contact);
+  color: var(--fg);
+}
+
+.settings-btn .ico {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  color: var(--fg3);
+}
+
+.settings-btn:hover .ico,
+.settings-btn.is-active .ico {
+  color: currentColor;
 }
 
 .foot {
