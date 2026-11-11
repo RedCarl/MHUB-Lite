@@ -1,0 +1,29 @@
+{
+  "name": "mhub-lite",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "跨平台 MCHOSE 设备管理工具",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "tauri": "tauri",
+    "test:core": "cargo test -p mhub-core",
+    "lint:rust": "cargo clippy -p mhub-core --all-targets -- -D warnings && cargo clippy -p mhub-lite -- -D warnings"
+  },
+  "dependencies": {
+    "@hugeicons/core-free-icons": "^4.4.0",
+    "@hugeicons/svelte": "^1.1.5",
+    "@tauri-apps/api": "^2.1.1"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^5.0.3",
+    "@tauri-apps/cli": "^2.1.0",
+    "svelte": "^5.16.0",
+    "svelte-check": "^4.1.1",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.7"
+  }
+}

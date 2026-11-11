@@ -1,0 +1,54 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "MHUB Lite",
+  "version": "0.1.0",
+  "identifier": "com.mhub.lite",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "MHUB Lite",
+        "width": 1140,
+        "height": 760,
+        "minWidth": 900,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "trafficLightPosition": {
+          "x": 18,
+          "y": 18
+        }
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "publisher": "MHUB Lite",
+    "copyright": "Copyright © 2026 MHUB Lite",
+    "category": "Utility",
+    "shortDescription": "轻量、离线、跨平台的 MCHOSE 设备管理工具",
+    "longDescription": "MHUB Lite 直接通过 USB HID 读写 MCHOSE 鼠标的板载配置：DPI 档位、回报率、按键映射、防抖与休眠。没有云端账号，没有 Electron。",
+    "macOS": {
+      "minimumSystemVersion": "11.0"
+    }
+  }
+}

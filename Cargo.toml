@@ -1,0 +1,18 @@
+[workspace]
+members = ["core", "src-tauri"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["RedCarl"]
+
+# 发布包尽量小：设备和协议层没有需要极致性能的热点，
+# 优先体积与启动速度（和 TinyMusic 同一套取舍）。
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
