@@ -170,8 +170,8 @@ pnpm tauri build    # 打包当前平台的安装包
 推送 `v*` tag 会触发 GitHub Actions 的 `release` 工作流：在 macOS arm64、macOS x64 和 Windows x64 上分别构建，并把安装包上传到对应的 GitHub Release。
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.1.2
+git push origin v0.1.2
 ```
 
 
