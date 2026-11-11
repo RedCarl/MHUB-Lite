@@ -12,6 +12,22 @@ pub const POLLING_TABLE: [u32; 7] = [125, 250, 500, 1000, 2000, 4000, 8000];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub enum DeviceKind {
+    Mouse,
+    Keyboard,
+}
+
+impl DeviceKind {
+    pub fn label_zh(self) -> &'static str {
+        match self {
+            DeviceKind::Mouse => "鼠标",
+            DeviceKind::Keyboard => "键盘",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum ConnectionKind {
     Wired,
     Wireless,
@@ -335,6 +351,7 @@ pub struct Battery {
 #[serde(rename_all = "camelCase")]
 pub struct DeviceInfo {
     pub key: String,
+    pub kind: DeviceKind,
     pub model: Option<String>,
     pub product_name: String,
     pub vendor_id: u16,
@@ -353,6 +370,7 @@ pub struct DeviceInfo {
 #[serde(rename_all = "camelCase")]
 pub struct DeviceSummary {
     pub key: String,
+    pub kind: DeviceKind,
     pub name: String,
     pub model: Option<String>,
     pub serial: Option<String>,

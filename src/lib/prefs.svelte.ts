@@ -5,14 +5,12 @@ const KEY = 'mhub.prefs.v1';
 export type ThemeMode = 'auto' | 'light' | 'dark';
 
 type Stored = {
-  demoMode: boolean;
   showUnknown: boolean;
   pollSeconds: number;
   theme: ThemeMode;
 };
 
 const defaults: Stored = {
-  demoMode: false,
   showUnknown: true,
   pollSeconds: 5,
   theme: 'auto',
@@ -24,7 +22,6 @@ function load(): Stored {
     if (!raw) return { ...defaults };
     const parsed = JSON.parse(raw) as Partial<Stored>;
     return {
-      demoMode: !!parsed.demoMode,
       showUnknown: parsed.showUnknown !== false,
       pollSeconds: [0, 2, 5, 10, 30].includes(Number(parsed.pollSeconds))
         ? Number(parsed.pollSeconds)
@@ -45,7 +42,6 @@ export function persistPrefs() {
     localStorage.setItem(
       KEY,
       JSON.stringify({
-        demoMode: prefs.demoMode,
         showUnknown: prefs.showUnknown,
         pollSeconds: prefs.pollSeconds,
         theme: prefs.theme,

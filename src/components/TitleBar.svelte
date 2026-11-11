@@ -1,5 +1,6 @@
 <script lang="ts">
   import { HugeiconsIcon } from '@hugeicons/svelte';
+  import Logo from './Logo.svelte';
   import { icons, ICON_SIZE } from '../lib/icons';
 </script>
 
@@ -10,7 +11,7 @@
 -->
 <header class="titlebar" data-tauri-drag-region="deep">
   <div class="brand">
-    <span class="logo"><HugeiconsIcon icon={icons.mouse} size={ICON_SIZE.inline} /></span>
+    <span class="logo"><Logo size={20} /></span>
     <span>MHUB Lite</span>
   </div>
 </header>

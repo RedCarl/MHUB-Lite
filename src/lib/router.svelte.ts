@@ -2,7 +2,7 @@
  * 是一个设备工具，页面层级很浅：五个一级页面，没有详情页。
  * 所以路由器只保留「当前页 + 上一页」，不做复杂的返回栈。
  */
-export type RouteName = 'overview' | 'dpi' | 'buttons' | 'performance' | 'settings';
+export type RouteName = 'overview' | 'dpi' | 'buttons' | 'lighting' | 'performance' | 'settings';
 
 export const router = $state<{ route: RouteName; previous: RouteName | null }>({
   route: 'overview',

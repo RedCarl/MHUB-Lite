@@ -22,6 +22,7 @@ import {
   Cursor01Icon,
   GaugeIcon,
   InformationCircleIcon,
+  KeyboardIcon,
   Loading03Icon,
   Mouse01Icon,
   MousePointerClickIcon,
@@ -51,6 +52,7 @@ export const icons = {
   settings: Settings01Icon,
   // 设备
   mouse: Mouse01Icon,
+  keyboard: KeyboardIcon,
   wired: UsbIcon,
   wireless: WirelessIcon,
   battery: BatteryFullIcon,

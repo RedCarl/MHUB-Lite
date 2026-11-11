@@ -93,6 +93,7 @@ pub fn scan_devices(include_unknown: bool) -> Result<Vec<DeviceSummary>, DeviceE
             };
             DeviceSummary {
                 key: d.key,
+                kind: crate::model::DeviceKind::Mouse,
                 name,
                 model: d.profile.map(|p| p.model.to_string()),
                 serial: d.serial,
@@ -114,6 +115,7 @@ pub fn scan_devices(include_unknown: bool) -> Result<Vec<DeviceSummary>, DeviceE
 pub fn demo_summary() -> DeviceSummary {
     DeviceSummary {
         key: DEMO_KEY.to_string(),
+        kind: crate::model::DeviceKind::Mouse,
         name: "MHUB 演示设备".to_string(),
         model: Some("mhub-demo".to_string()),
         serial: Some("DEMO-0001".to_string()),
@@ -161,6 +163,7 @@ impl Device {
 
         let mut info = DeviceInfo {
             key: desc.key.clone(),
+            kind: crate::model::DeviceKind::Mouse,
             model: Some(profile.model.to_string()),
             product_name: desc
                 .product_name
@@ -199,6 +202,7 @@ impl Device {
         let profile = &crate::catalog::PROFILES[0];
         let info = DeviceInfo {
             key: DEMO_KEY.to_string(),
+            kind: crate::model::DeviceKind::Mouse,
             model: Some("mhub-demo".to_string()),
             product_name: "MHUB 演示设备".to_string(),
             vendor_id: MCHOSE_VENDOR_ID,

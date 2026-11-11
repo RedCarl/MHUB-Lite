@@ -1,4 +1,4 @@
-# MCHOSE HID 协议笔记
+# MCHOSE HID 协议笔记（G3 V2 / A7 V3 Ultra+ / K99 V2）
 
 > 本文记录 MHUB Lite 实际使用的帧格式与字段。协议来自
 > [M-RustHub](https://github.com/hadoooooouken/M-RustHub) 对 MCHOSE G3 V2 的实机验证
@@ -223,3 +223,169 @@ MHUB Lite 在收到 ACK 后等待 250 ms，再继续读取。
 - M-RustHub 按钮协议文档：<https://github.com/hadoooooouken/M-RustHub/blob/main/docs/protocol_buttons.md>
 - M-RustHub 驱动实现：<https://github.com/hadoooooouken/M-RustHub/blob/main/src/driver/mod.rs>
 - 本项目实现：`core/src/protocol.rs`、`core/src/device.rs`
+
+
+---
+
+## 11. A7 V3 Ultra+（0x4D 协议）
+
+A7 V3 Ultra+（`0x3837:0x1018`）不用 G3 的 `0x55` 帧，而是 HID 报告 `0x4D`：
+
+```text
+4D 01 flag len cmd_lo cmd_hi 00 00 payload... checksum
+```
+
+- `flag = 1` 时最后一个字节是 `XOR(frame[2..8+len])`。
+- 读命令的 bit 15 为 0（`0x0900`、`0x0002`、`0x0003`），写命令为 1（`0x0102`、`0x0103`）。
+- macOS 上必须用 **output report + input report**（`hid_write` + `hid_read`）；
+  `get_feature_report` 会返回 `kIOReturnUnsupported`。本项目在 macOS 上实测可用。
+
+| 命令 | 方向 | 内容 |
+|---|---|---|
+| `0x0900` | 读 | 设备状态：VID/PID、配置数、连接、充电、电量 |
+| `0x0002` | 读 | 设置块 19 字节 |
+| `0x0003` | 读 | DPI 块 17 字节，payload `[profile, direction]` |
+| `0x0102` | 写 | 设置块，19 字节 |
+| `0x0103` | 写 | DPI 块，17 字节 |
+| `0x0009` / `0x0109` | 读/写 | LOD（当前界面未开放） |
+| `0x0001` / `0x0101` | 读/写 | 按键（当前界面未开放） |
+
+### 状态块
+
+实测 `0x0900`：
+
+```
+37 38 26 40 04 00 00 00 00 10 02 00 4d 00 08 e4
+```
+
+| 偏移 | 含义 |
+|---|---|
+| 0–1 | VID `0x3837` |
+| 2–3 | 机体 PID（例如 `0x4026`） |
+| 4 | 板载配置数量 |
+| 10 | 连接状态 |
+| 11 | 充电 |
+| 12 | 电量，`0x4D` = 77% |
+
+### 设置块（19 字节）
+
+| 偏移 | 含义 |
+|---|---|
+| 0 | 当前配置 |
+| 1 | 高 4 位 USB 回报率索引；低 4 位 DPI 档位 |
+| 2 | 高 4 位无线回报率索引；低 4 位 DPI 档位 |
+| 3 | 休眠分钟；0 = 不休眠 |
+| 4 | bit0 = 禁用休眠 |
+| 5 | 传感器标志 |
+| 6 | 角度 `i8` |
+| 7 | 左键防抖 ms |
+| 8 | 右键防抖 ms |
+
+回报率索引用 `rate_decode`：编码值 > 1 时减 1，再查 `[125, 500, 1000, 2000, 4000, 8000]`。
+
+### DPI 块：读和写的字段顺序不同
+
+```text
+读: [profile, ?, count, selected, separate_y, x0..x5]   // 17 字节
+写: [profile, direction, separate_y, count, selected, x0..x5]
+```
+
+**这是最容易写坏设备的一处。** 直接把读回数组写回去会把「档位数量」写成
+`selected` 的值、把「当前档位」写成 `separate_y`。本项目用
+`core/src/a7.rs::encode_dpi_payload` 单独构造写包，并有测试锁定顺序。
+
+### macOS 传输
+
+- 打开 usage page `0xFF01` 的接口（interface 2）。
+- 先 `write` 64 字节帧，再 `read_timeout` 读 64 字节输入报告。
+- 设备事件命令 `0x0600` 会出现，读取时忽略，继续等目标命令。
+
+---
+
+## 12. K99 V2 2.4G（0x13 无线包）
+
+2.4G 接收器 `0x41E4:0x2001` 的配置接口是 usage page `0xFF02`，
+用 output/input report `0x13`：
+
+```text
+[0] cmd   [1] total   [2] seq   [3] yy   [4..17] 14 bytes data   [18] checksum
+checksum = (0x13 + sum(packet[0..17])) & 0xFF
+```
+
+一次输出是 `0x13 + 19 字节`（共 20 字节）；一次输入同样按 `0x13` 解析。
+同一个接收器可能混入鼠标/键盘事件包，必须按命令号过滤。
+
+### 型号签名
+
+读命令 `5`，返回 6 字节签名。K99 V2 是：
+
+```
+03 00 00 00 01 DF
+```
+
+签名不匹配时拒绝打开写入。
+
+### 命令映射
+
+接收器对有线 K99 V2 的 feature-report 命令做了映射：
+
+| 读 | 无线读 | 写 | 无线写 |
+|---|---|---|---|
+| `0x87` 电量 | `0x4A` | — | — |
+| `0x84` 性能 | `0x44` | `0x04` 性能 | `4` |
+| `0x8A` 单色表 | `0x49` | `0x0A` 单色表 | `9` |
+| `0x83` 键层 | `0x41`（`packet[3]=layer<<4`） | `0x03` 键层 | `1` |
+| `0x86` 逐键 RGB | `0x42` | `0x06` 逐键 RGB | `2` |
+
+读请求是 19 字节包：`[cmd, 1, 0, 0, ...]`，键层把层号写进 `packet[3]`
+的高 4 位。
+
+### 数据块
+
+- 电量：2 字节，`[percent, status]`，低 4 位非 0 = 充电。
+- 性能：128 字节，偏移见下表。
+- 单色表：490 字节。
+- 键层：3 × 452 字节（113 键 × 4 字节）。
+
+性能块偏移（K99 V2）：
+
+| 偏移 | 含义 |
+|---|---|
+| 1 | 回报率 1/2/3 = 250/500/1000 Hz |
+| 3 | 延迟：0 速度、2 标准、3 特殊 |
+| 9 | 灯效组：0 常规、1 逐键 |
+| 10 | 当前灯效编号 |
+| 15 | Win 键锁定 |
+| 24 | 休眠分钟 × 2 |
+| 27 | Mac 模式 |
+| 58… | 各灯效的亮度 / 速度与多彩 |
+
+灯效编号：0 关闭、1 常亮、2 呼吸、3 梦幻彩虹、4 一触即发、5 雨中漫步、
+7 涟漪扩散、8 繁星点点、10 川流不息、11 随波逐流、12 如影随形、13 正弦光波、
+15 旋转风车、16 七彩瀑布、17 花开富贵、21 自定义。
+
+### 写包分段
+
+- 14 字节一个分包；`total` 写进 `packet[1]`，`seq` 写进 `packet[2]`。
+- 性能命令 `4`：最后一包的 `yy` 是实际字节数。
+- 键层 `1` / 灯效 `9`：最后一包的 `yy` 按尾部连续 0 的数量回退，
+  并保留结尾 `00*58 + 5A A5`（键层）或 `00*16 + 5A A5 + 00*4`（灯效）。
+- 每个分包等待接收器回 ACK（同 cmd、同 seq），最多重试 3 次。
+- **写命令之间至少间隔 1.2 秒**；本项目在连续写入时强制串行并等待。
+
+### 键层编码
+
+- 113 个槽位，每个 4 字节；协议顺序与 `src/lib/keyboard.ts` 的 `KEY_NAMES` 一致。
+- 默认层通常是非零键码；Fn / Fn2 层中未映射的槽位是 `00 00 00 00`。
+- 修改某一层时写入整层 452 字节 + 58 字节 0 + `5A A5`，共 512 字节。
+  因此必须先读回整层，只改目标键，再写回。
+
+---
+
+## 13. 参考
+
+- M-RustHub：<https://github.com/hadoooooouken/M-RustHub>
+- mchose-hub-rust（A7 V3 Ultra+ / MagDock，MIT）：<https://github.com/mansur54321/mchose-hub-rust>
+- MchoseHub（K99 V2 无线包与键表）：<https://github.com/wzk112/MchoseHub>
+- mchose-linux（K99 V2 有线协议，MIT）：<https://github.com/aipno/mchose-linux>
+- 本项目实现：`core/src/protocol.rs`、`core/src/a7.rs`、`core/src/keyboard.rs`

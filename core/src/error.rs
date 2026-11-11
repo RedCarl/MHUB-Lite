@@ -70,6 +70,10 @@ impl DeviceError {
     pub fn invalid(message: impl Into<String>) -> Self {
         Self::new(ErrorCode::Invalid, message)
     }
+
+    pub fn busy(message: impl Into<String>) -> Self {
+        Self::new(ErrorCode::Busy, message)
+    }
 }
 
 impl fmt::Display for DeviceError {
@@ -86,6 +90,11 @@ impl From<hidapi::HidError> for DeviceError {
         let lower = text.to_lowercase();
         // macOS 上「没有权限」和「设备没插」是两种完全不同的处理方式，
         // 不要都吞成一句「打开失败」。
+        if lower.contains("exclusive") || lower.contains("already open") {
+            return DeviceError::busy(
+                "设备被其他程序独占：请关闭 MCHOSE HUB、浏览器里的 MCHOSE 网页驱动或其他占用 HID 的程序后重试",
+            );
+        }
         if lower.contains("permission")
             || lower.contains("access")
             || lower.contains("not permitted")

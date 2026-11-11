@@ -3,20 +3,20 @@
   import { icons, ICON_SIZE } from '../lib/icons';
   import {
     device,
-    draft,
     canEdit,
     restoreFactory,
     setActiveStage,
     setDpi,
     setStageCount,
     nudgeDpi,
+    saveLabel,
   } from '../lib/device.svelte';
   import Segmented from '../components/Segmented.svelte';
   import Slider from '../components/Slider.svelte';
 
-  const snap = $derived(device.current);
-  const cfg = $derived(draft.config);
-  const caps = $derived(snap?.info.capabilities ?? null);
+  const snap = $derived(device.mouse);
+  const cfg = $derived(snap?.config);
+  const caps = $derived(snap?.info.capabilities);
   const editable = $derived(canEdit());
 
   const stageCountOptions = $derived(
@@ -25,10 +25,6 @@
   const activeOptions = $derived(
     Array.from({ length: cfg?.stageCount ?? 0 }, (_, i) => ({ value: i + 1, label: `${i + 1}` })),
   );
-
-  function setStageCountSafe(n: number) {
-    setStageCount(n);
-  }
 
   function onNumber(index: number, value: string) {
     const n = Number(value);
@@ -41,11 +37,10 @@
   <div class="page-head">
     <div class="page-title">
       <h1>DPI</h1>
-      <p class="page-sub">
-        设置启用的档位数、当前档位，以及每一档的具体 DPI；改动先留在草稿，写入后才生效。
-      </p>
+      <p class="page-sub">设置启用的档位数、当前档位和每档 DPI。每次修改都会即时写入设备。</p>
     </div>
     <div class="page-actions">
+      {#if saveLabel()}<span class="save-chip" class:busy={device.saveState === 'saving'}>{saveLabel()}</span>{/if}
       <button class="btn" onclick={restoreFactory} disabled={!editable}>
         <HugeiconsIcon icon={icons.reset} size={ICON_SIZE.inline} />
         恢复默认值
@@ -57,8 +52,8 @@
     <div class="alert info">
       <HugeiconsIcon icon={icons.info} size={ICON_SIZE.control} />
       <div class="alert-body">
-        <strong>还没有连接设备</strong>
-        <span>回到概览页扫描并连接 MCHOSE 设备后，这里才会出现可调的档位。</span>
+        <strong>还没有连接鼠标</strong>
+        <span>回到概览页连接 MCHOSE 鼠标后，这里才会出现可调的档位。</span>
       </div>
     </div>
   {:else if !snap.online || !cfg || !caps}
@@ -66,7 +61,7 @@
       <HugeiconsIcon icon={icons.sleep} size={ICON_SIZE.control} />
       <div class="alert-body">
         <strong>鼠标正在休眠</strong>
-        <span>配置在休眠时不可读也不可写。移动鼠标唤醒后，到概览页点「重新读取」。</span>
+        <span>移动鼠标唤醒后，到概览页点「重新读取」。</span>
       </div>
     </div>
   {:else}
@@ -74,16 +69,9 @@
       <div class="setting-row">
         <div class="setting-label">
           <span>启用的档位数量</span>
-          <span class="setting-desc">
-            按鼠标上的 DPI 键会在这些档位之间循环；最多 {caps.maxStages} 档。
-          </span>
+          <span class="setting-desc">按鼠标上的 DPI 键会在这些档位之间循环；最多 {caps.maxStages} 档。</span>
         </div>
-        <Segmented
-          value={cfg.stageCount}
-          options={stageCountOptions}
-          onchange={setStageCountSafe}
-          label="启用的档位数量"
-        />
+        <Segmented value={cfg.stageCount} options={stageCountOptions} onchange={setStageCount} label="启用的档位数量" />
       </div>
 
       <div class="setting-row">
@@ -91,12 +79,7 @@
           <span>当前使用的档位</span>
           <span class="setting-desc">决定鼠标此刻以哪一档 DPI 工作，也可以直接点下面的档位号码。</span>
         </div>
-        <Segmented
-          value={cfg.activeStage}
-          options={activeOptions}
-          onchange={setActiveStage}
-          label="当前使用的档位"
-        />
+        <Segmented value={cfg.activeStage} options={activeOptions} onchange={setActiveStage} label="当前使用的档位" />
       </div>
     </section>
 
@@ -118,9 +101,7 @@
             <div class="stage-head">
               <div class="stage-heading">
                 <span class="stage-title">第 {index + 1} 档</span>
-                {#if cfg.activeStage === index + 1}
-                  <span class="badge on">正在使用</span>
-                {/if}
+                {#if cfg.activeStage === index + 1}<span class="badge on">正在使用</span>{/if}
               </div>
               <label class="dpi-number">
                 <input
@@ -142,7 +123,7 @@
                 class="step"
                 onclick={() => nudgeDpi(index, -caps.dpiRange.step)}
                 disabled={!editable || dpi <= caps.dpiRange.min}
-                aria-label="减少 100 DPI"
+                aria-label="减少一档 DPI"
               >−</button>
               <Slider
                 value={dpi}
@@ -157,7 +138,7 @@
                 class="step"
                 onclick={() => nudgeDpi(index, caps.dpiRange.step)}
                 disabled={!editable || dpi >= caps.dpiRange.max}
-                aria-label="增加 100 DPI"
+                aria-label="增加一档 DPI"
               >+</button>
             </div>
 
@@ -173,7 +154,7 @@
 
     <p class="footnote">
       第 1 档到第 {cfg.stageCount} 档会随鼠标指针移动方向循环切换；未启用的档位不会出现在鼠标上。
-      写入后配置保存在板载 Flash，换电脑也保留。
+      写入后配置保存在板载存储，换电脑也保留。
     </p>
   {/if}
 </div>

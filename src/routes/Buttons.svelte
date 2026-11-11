@@ -3,10 +3,10 @@
   import { icons, ICON_SIZE } from '../lib/icons';
   import {
     device,
-    draft,
     canEdit,
     setButton,
     setScrollReversed,
+    saveLabel,
   } from '../lib/device.svelte';
   import { FACTORY_BUTTONS, type ButtonAction } from '../lib/api';
   import { actionLabel, BUTTON_LABELS } from '../lib/format';
@@ -15,10 +15,11 @@
   import Segmented from '../components/Segmented.svelte';
   import MouseView from '../components/MouseView.svelte';
 
-  const snap = $derived(device.current);
-  const cfg = $derived(draft.config);
-  const buttons = $derived(draft.buttons);
-  const editable = $derived(canEdit());
+  const snap = $derived(device.mouse);
+  const cfg = $derived(snap?.config);
+  const buttons = $derived(snap?.buttons ?? null);
+  const caps = $derived(snap?.info.capabilities);
+  const editable = $derived(canEdit() && !!caps?.buttons);
   let hovered = $state(uiState.buttonFocus);
 
   // 从概览的鼠标预览点进来时，先把对应行亮起来，再清掉一次性状态
@@ -78,10 +79,11 @@
     <div class="page-title">
       <h1>按键</h1>
       <p class="page-sub">
-        把鼠标上的按键映射成别的动作。映射写在鼠标的板载 Flash 里，不依赖后台程序。
+        把鼠标上的按键映射成别的动作。映射写在板载存储里，修改后即时生效。
       </p>
     </div>
     <div class="page-actions">
+      {#if saveLabel()}<span class="save-chip" class:busy={device.saveState === 'saving'}>{saveLabel()}</span>{/if}
       <button class="btn" onclick={resetButtons} disabled={!editable}>
         <HugeiconsIcon icon={icons.reset} size={ICON_SIZE.inline} />
         恢复默认按键
@@ -97,12 +99,12 @@
         <span>回到概览页连接鼠标后，才能读取和改写按键映射。</span>
       </div>
     </div>
-  {:else if !snap.online || !cfg || !buttons}
+  {:else if !snap.online || !cfg || !buttons || !caps?.buttons}
     <div class="alert warn">
       <HugeiconsIcon icon={icons.sleep} size={ICON_SIZE.control} />
       <div class="alert-body">
-        <strong>鼠标正在休眠</strong>
-        <span>按键映射需要设备在线才能读写。唤醒鼠标后重新读取。</span>
+        <strong>{caps && !caps.buttons ? '该型号暂不支持改键' : '鼠标正在休眠'}</strong>
+        <span>{caps && !caps.buttons ? 'A7 V3 Ultra+ 的按键映射协议尚未开放；DPI 与性能页可正常使用。' : '按键映射需要设备在线才能读写。唤醒鼠标后重新读取。'}</span>
       </div>
     </div>
   {:else}

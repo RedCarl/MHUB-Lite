@@ -934,8 +934,7 @@ main {
     0 10px 30px -18px var(--glass-shade);
   overflow-y: auto;
   overflow-x: hidden;
-  padding-bottom: 100px;
-  transition: padding-bottom 280ms cubic-bezier(0.22, 1, 0.36, 1);
+  padding-bottom: 40px;
 }
 
 /* ==========================================================================
@@ -2924,5 +2923,447 @@ select:-webkit-autofill {
 
   .bar-sub {
     max-width: 140px;
+  }
+}
+
+
+/* ==========================================================================
+   17. 键盘 / 即时保存 / 设备切换
+   ========================================================================== */
+
+.save-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background-color: var(--ok-bg);
+  box-shadow: inset 0 0 0 1px var(--ok-border);
+  color: var(--success);
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.save-chip.busy {
+  background-color: var(--warn-bg);
+  box-shadow: inset 0 0 0 1px var(--warn-border);
+  color: var(--warn);
+}
+
+.device-switch {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  margin: 0 0 10px;
+  border-radius: var(--r-sm);
+  background-color: var(--glass-control);
+  box-shadow: var(--control-shadow);
+}
+
+.device-switch button {
+  flex: 1;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border-radius: 6px;
+  color: var(--fg3);
+  font-size: 11.5px;
+}
+
+.device-switch button:hover:not(.on) {
+  color: var(--fg);
+}
+
+.device-switch button.on {
+  background-color: var(--hover);
+  color: var(--fg);
+  box-shadow: inset 0 1px 0 var(--glass-rim), 0 1px 2px oklch(0 0 0 / 18%);
+}
+
+.avatar-dot.saving {
+  background-color: var(--warn);
+}
+
+/* ---- 键盘主卡 ---- */
+.keyboard-hero {
+  grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.8fr);
+  align-items: center;
+}
+
+.keyboard-figure {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 16px 8px;
+  border-radius: var(--r-lg);
+  background:
+    radial-gradient(60% 60% at 50% 40%, color-mix(in oklch, var(--brand) 7%, transparent), transparent 72%),
+    linear-gradient(180deg, oklch(1 0 0 / 2%), transparent);
+}
+
+.board-caption {
+  color: var(--fg3);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ---- 键盘矩阵 ---- */
+.kb-board {
+  position: relative;
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  user-select: none;
+}
+
+.kb-key {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 0 2px;
+  border-radius: 5px;
+  background-color: var(--glass-control);
+  box-shadow:
+    inset 0 1px 0 var(--glass-control-rim), 0 0 0 1px var(--glass-edge),
+    0 1px 2px var(--glass-contact);
+  color: var(--fg2);
+  overflow: hidden;
+  font-size: clamp(6px, 0.75vw, 10px);
+  line-height: 1.1;
+  text-align: center;
+  transition:
+    background-color 120ms ease-out,
+    color 120ms ease-out,
+    box-shadow 120ms ease-out;
+}
+
+.kb-key:hover {
+  background-color: var(--hover);
+  color: var(--fg);
+  z-index: 2;
+}
+
+.kb-key.sel {
+  background-color: color-mix(in oklch, var(--brand) 22%, transparent);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in oklch, var(--brand) 55%, transparent),
+    0 2px 8px -2px var(--glass-shade);
+  color: var(--fg);
+  z-index: 3;
+}
+
+.kb-label {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.kb-code {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg3);
+  font-size: 7.5px;
+  font-weight: 400;
+}
+
+.kb-key.sel .kb-code {
+  color: color-mix(in oklch, var(--brand) 70%, var(--fg));
+}
+
+.kb-board.compact .kb-key {
+  background-color: color-mix(in oklch, var(--glass-control) 70%, transparent);
+}
+
+.kb-board.compact .kb-label {
+  font-size: 8px;
+}
+
+.kb-card {
+  padding: 16px;
+}
+
+.kb-wrap {
+  display: flex;
+  justify-content: center;
+}
+
+/* ---- 三层标签 ---- */
+.layer-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.layer-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: var(--r-sm);
+  background-color: var(--glass-control);
+  box-shadow: var(--control-shadow);
+  color: var(--fg2);
+  font-size: 12px;
+}
+
+.layer-tabs button:hover:not(.on) {
+  background-color: var(--hover);
+  color: var(--fg);
+}
+
+.layer-tabs button.on {
+  background-color: var(--hover);
+  box-shadow:
+    inset 0 1px 0 var(--glass-rim),
+    0 0 0 1px var(--glass-state-edge);
+  color: var(--fg);
+}
+
+.layer-index {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background-color: var(--bg3);
+  color: var(--fg3);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+}
+
+.layer-tabs button.on .layer-index {
+  background-color: color-mix(in oklch, var(--brand) 20%, transparent);
+  color: var(--brand);
+}
+
+.layer-hint {
+  margin-left: auto;
+  color: var(--fg3);
+  font-size: 10.5px;
+}
+
+/* ---- 按键检查器 ---- */
+.key-inspector {
+  margin-top: 10px;
+}
+
+.inspector-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.inspector-head h3 {
+  margin: 2px 0 2px;
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.inspector-sub {
+  color: var(--fg3);
+  font-size: 11px;
+}
+
+.code-chip {
+  padding: 5px 10px;
+  border-radius: var(--r-sm);
+  background-color: var(--bg3);
+  color: var(--fg2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.inspector-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 16px;
+  padding-top: 14px;
+}
+
+.inspector-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--fg3);
+  font-size: 10.5px;
+}
+
+.action-select.wide {
+  width: 100%;
+  min-width: 0;
+}
+
+.custom-code {
+  display: flex;
+  gap: 6px;
+}
+
+.custom-code .st-input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  background-color: var(--field);
+  border: 1px solid var(--field-edge);
+  border-radius: var(--r-sm);
+  color: var(--fg);
+  padding: 0 10px;
+}
+
+.inspector-empty {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 4px;
+  color: var(--fg3);
+}
+
+.inspector-empty strong {
+  display: block;
+  color: var(--fg);
+  font-size: 13px;
+}
+
+.inspector-empty span {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+}
+
+/* ---- 灯光 ---- */
+.lighting-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 1fr);
+  gap: 28px;
+  padding: 22px 24px;
+}
+
+.light-preview {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  min-height: 240px;
+  padding: 24px;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  background:
+    radial-gradient(55% 55% at 30% 45%, color-mix(in oklch, var(--light-color) 28%, transparent), transparent 72%),
+    linear-gradient(180deg, oklch(1 0 0 / 2%), transparent);
+}
+
+.light-orb {
+  width: 128px;
+  height: 128px;
+  flex: none;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 38% 32%, oklch(1 0 0 / 80%), transparent 32%),
+    radial-gradient(circle at 60% 65%, var(--light-color), color-mix(in oklch, var(--light-color) 55%, black));
+  box-shadow:
+    0 0 50px 8px color-mix(in oklch, var(--light-color) 45%, transparent),
+    inset 0 -8px 20px oklch(0 0 0 / 25%);
+}
+
+.light-meta h2 {
+  margin: 2px 0 4px;
+  font-size: 23px;
+  font-weight: 680;
+  letter-spacing: -0.025em;
+}
+
+.light-sub {
+  color: var(--fg3);
+  font-size: 11.5px;
+}
+
+.lighting-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  justify-content: center;
+}
+
+.lighting-row {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) 46px;
+  align-items: center;
+  gap: 12px;
+}
+
+.lighting-label {
+  color: var(--fg2);
+  font-size: 11.5px;
+}
+
+.lighting-value {
+  color: var(--fg3);
+  font-size: 11px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.color-input {
+  width: 100%;
+  height: 30px;
+  padding: 2px;
+  border: 1px solid var(--field-edge);
+  border-radius: var(--r-sm);
+  background-color: var(--field);
+  cursor: pointer;
+}
+
+.color-input:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ---- 设置里的设备行 ---- */
+.st-device-row.active {
+  background-color: color-mix(in oklch, var(--brand) 6%, transparent);
+}
+
+.st-device-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.st-device-name .badge {
+  height: 18px;
+  padding: 0 7px;
+  font-size: 9px;
+}
+
+/* ---- 窄窗口补充 ---- */
+@media (max-width: 1020px) {
+  .keyboard-hero,
+  .lighting-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .inspector-controls {
+    grid-template-columns: 1fr;
   }
 }

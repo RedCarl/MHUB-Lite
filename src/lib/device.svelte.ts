@@ -1,24 +1,32 @@
-import {
-  api,
-  ApiFailure,
-  cloneConfig,
-  isTauri,
-  type ButtonAction,
-  type DeviceSummary,
-  type ErrorCode,
-  type MouseConfig,
-  type Snapshot,
+import { api, ApiFailure, cloneConfig, isTauri } from './api';
+import type {
+  Battery,
+  ButtonAction,
+  DeviceKind,
+  DeviceSummary,
+  ErrorCode,
+  KeyboardInput,
+  KeyboardPerformance,
+  KeyboardSnapshot,
+  MouseConfig,
+  Snapshot,
 } from './api';
 import { prefs, persistPrefs } from './prefs.svelte';
 import { showToast } from './toast.svelte';
 import { clamp, formatHz, formatMinutes, connectionLabel } from './format';
 
-type BusyKind = 'scanning' | 'connecting' | 'reading' | 'applying' | null;
+type BusyKind = 'scanning' | 'connecting' | 'reading' | null;
+export type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
 export const device = $state<{
   devices: DeviceSummary[];
+  mouse: Snapshot | null;
+  /** 兼容旧页面：指向当前鼠标快照 */
   current: Snapshot | null;
+  keyboard: KeyboardSnapshot | null;
+  active: DeviceKind | null;
   busy: BusyKind;
+  saveState: SaveState;
   error: string;
   errorCode: ErrorCode | null;
   version: string;
@@ -26,22 +34,17 @@ export const device = $state<{
   browserDemo: boolean;
 }>({
   devices: [],
+  mouse: null,
   current: null,
+  keyboard: null,
+  active: null,
   busy: null,
+  saveState: 'idle',
   error: '',
   errorCode: null,
   version: '',
   initialized: false,
   browserDemo: !isTauri,
-});
-
-/** 用户正在编辑的副本；写入前一直和「设备里的样子」分开。 */
-export const draft = $state<{
-  config: MouseConfig | null;
-  buttons: ButtonAction[] | null;
-}>({
-  config: null,
-  buttons: null,
 });
 
 function setError(e: unknown, prefix = '') {
@@ -59,14 +62,59 @@ export function clearError() {
   device.errorCode = null;
 }
 
-function resetDraftFrom(snap: Snapshot | null) {
-  if (snap?.config && snap.buttons) {
-    draft.config = cloneConfig(snap.config);
-    draft.buttons = [...snap.buttons];
-  } else {
-    draft.config = null;
-    draft.buttons = null;
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let saveIdleTimer: ReturnType<typeof setTimeout> | null = null;
+let savesInFlight = 0;
+
+function beginSave() {
+  savesInFlight += 1;
+  if (saveIdleTimer) clearTimeout(saveIdleTimer);
+  device.saveState = 'saving';
+}
+
+function endSave() {
+  savesInFlight = Math.max(0, savesInFlight - 1);
+  if (savesInFlight > 0) return;
+  device.saveState = 'saved';
+  if (saveIdleTimer) clearTimeout(saveIdleTimer);
+  saveIdleTimer = setTimeout(() => {
+    if (savesInFlight === 0 && device.saveState === 'saved') device.saveState = 'idle';
+  }, 1600);
+}
+
+export function saveLabel(): string {
+  switch (device.saveState) {
+    case 'saving':
+      return '保存中…';
+    case 'saved':
+      return '已保存';
+    case 'error':
+      return '保存失败';
+    default:
+      return '';
   }
+}
+
+export function activeInfo() {
+  return device.active === 'keyboard' ? device.keyboard?.info ?? null : device.mouse?.info ?? null;
+}
+
+export function activeBattery(): Battery | null {
+  return device.active === 'keyboard'
+    ? device.keyboard?.battery ?? null
+    : device.mouse?.battery ?? null;
+}
+
+export function isOnline(): boolean {
+  return device.active === 'keyboard'
+    ? !!device.keyboard?.online
+    : !!device.mouse?.online;
+}
+
+export function switchTo(kind: DeviceKind) {
+  if (kind === 'mouse' && !device.mouse) return;
+  if (kind === 'keyboard' && !device.keyboard) return;
+  device.active = kind;
 }
 
 export async function init() {
@@ -76,182 +124,165 @@ export async function init() {
   } catch {
     device.version = '0.1.0';
   }
-  if (isTauri && prefs.demoMode) {
-    try {
-      await api.setDemoMode(true);
-    } catch {
-      /* 旧后端没有演示模式时忽略 */
-    }
-  }
-  await scan(false);
+  await scan();
   device.initialized = true;
-  // 首次进来自动连一台能用的设备，省掉一次点击。
-  await autoConnect();
 }
 
-async function autoConnect() {
-  if (device.current) return;
-  const target = device.devices.find((d) => d.supported);
-  if (target) await connect(target.key, true);
-}
+let scanning = false;
 
 export async function scan(auto = true) {
-  if (device.busy === 'applying') return;
+  if (scanning) return;
+  scanning = true;
   device.busy = 'scanning';
   clearError();
   try {
     const list = await api.scanDevices(prefs.showUnknown);
     device.devices = list;
 
-    const stillThere =
-      device.current && list.some((d) => d.key === device.current?.info.key);
-    if (stillThere) {
-      // 设备还在：不打断当前编辑，只刷新连接状态。
+    if (!auto) {
+      if (device.mouse && !list.some((d) => d.key === device.mouse?.info.key)) {
+        device.mouse = null;
+        device.current = null;
+      }
+      if (device.keyboard && !list.some((d) => d.key === device.keyboard?.info.key)) {
+        device.keyboard = null;
+      }
+      syncActive();
       return;
     }
 
-    if (device.current) {
-      device.current = null;
-      resetDraftFrom(null);
+    const mouseTarget = list.find((d) => d.kind === 'mouse' && d.supported) ?? null;
+    const keyboardTarget = list.find((d) => d.kind === 'keyboard' && d.supported) ?? null;
+    const keepMouse = device.mouse && list.some((d) => d.key === device.mouse?.info.key);
+    const keepKeyboard =
+      device.keyboard && list.some((d) => d.key === device.keyboard?.info.key);
+
+    const jobs: Promise<unknown>[] = [];
+    if (!keepMouse) {
+      if (device.mouse) {
+        device.mouse = null;
+        device.current = null;
+      }
+      if (mouseTarget) jobs.push(connectMouse(mouseTarget.key, true));
     }
-    if (auto) await autoConnect();
+    if (!keepKeyboard) {
+      if (device.keyboard) device.keyboard = null;
+      if (keyboardTarget) jobs.push(connectKeyboard(keyboardTarget.key, true));
+    }
+    if (jobs.length) {
+      device.busy = 'connecting';
+      await Promise.allSettled(jobs);
+    }
+    syncActive();
   } catch (e) {
     setError(e, '扫描设备失败');
   } finally {
+    scanning = false;
     device.busy = null;
+  }
+}
+
+function syncActive() {
+  if (device.active === 'mouse' && device.mouse) return;
+  if (device.active === 'keyboard' && device.keyboard) return;
+  device.active = device.mouse ? 'mouse' : device.keyboard ? 'keyboard' : null;
+}
+
+async function connectMouse(key: string, quiet = false) {
+  try {
+    const snap = await api.connect(key);
+    device.mouse = snap;
+    device.current = snap;
+    device.active = 'mouse';
+    if (!quiet) showToast('已连接鼠标');
+    return snap;
+  } catch (e) {
+    setError(e, '连接鼠标失败');
+    throw e;
+  }
+}
+
+async function connectKeyboard(key: string, quiet = false) {
+  try {
+    const snap = await api.connectKeyboard(key);
+    device.keyboard = snap;
+    if (!device.mouse) device.active = 'keyboard';
+    if (!quiet) showToast('已连接键盘');
+    return snap;
+  } catch (e) {
+    setError(e, '连接键盘失败');
+    throw e;
   }
 }
 
 export async function connect(key: string, quiet = false) {
+  const summary = device.devices.find((d) => d.key === key);
+  if (!summary) return;
   device.busy = 'connecting';
   clearError();
   try {
-    const snap = await api.connect(key);
-    device.current = snap;
-    if (isTauri && snap.info.isDemo && !prefs.demoMode) {
-      // 通过 MHUB_DEMO=1 启动时，让设置里的开关跟着真实状态走
-      prefs.demoMode = true;
-      persistPrefs();
-    }
-    resetDraftFrom(snap);
-    if (!quiet) {
-      showToast(snap.online ? '已读取设备配置' : '接收器已连接，鼠标正在休眠');
-    }
-  } catch (e) {
-    setError(e, '连接设备失败');
-    if (!quiet) showToast('连接设备失败');
+    if (summary.kind === 'keyboard') await connectKeyboard(key, quiet);
+    else await connectMouse(key, quiet);
   } finally {
     device.busy = null;
   }
 }
 
-export async function refresh(silent = false) {
-  if (!device.current || device.busy === 'applying' || device.busy === 'connecting') return;
-  const wasDirty = isDirty();
-  if (!silent) device.busy = 'reading';
+export async function refresh() {
+  if (device.busy === 'connecting' || device.busy === 'scanning') return;
+  device.busy = 'reading';
+  clearError();
   try {
-    const snap = await api.refresh();
-    device.current = snap;
-    if (!wasDirty) resetDraftFrom(snap);
-    clearError();
-    if (!silent) showToast('已从设备重新读取');
-  } catch (e) {
-    if (!silent) {
-      setError(e, '重新读取失败');
-      showToast('重新读取失败');
+    if (device.active === 'keyboard' && device.keyboard) {
+      device.keyboard = await api.refreshKeyboard();
+      showToast('已从键盘重新读取');
+    } else if (device.mouse) {
+      const snap = await api.refresh();
+      device.mouse = snap;
+      device.current = snap;
+      showToast('已从鼠标重新读取');
     }
+  } catch (e) {
+    setError(e, '重新读取失败');
+    showToast('重新读取失败');
   } finally {
-    if (!silent) device.busy = null;
+    device.busy = null;
   }
 }
 
-/** 后台轮询只碰「在线状态 + 电量」，不覆盖用户正在改的草稿。 */
 export async function pollLive() {
-  if (!device.current || device.busy) return;
+  if (device.busy) return;
   try {
-    const live = await api.liveStatus();
-    const wasOnline = device.current.online;
-    device.current.online = live.online;
-    device.current.battery = live.battery;
-    if (!wasOnline && live.online) {
-      showToast('设备已唤醒，正在同步配置');
-      await refresh(true);
-    } else if (wasOnline && !live.online) {
-      showToast('设备进入休眠：配置暂不可写');
+    if (device.active === 'keyboard' && device.keyboard) {
+      const live = await api.keyboardLive();
+      device.keyboard.online = live.online;
+      device.keyboard.battery = live.battery;
+    } else if (device.mouse) {
+      const live = await api.liveStatus();
+      device.mouse.online = live.online;
+      device.mouse.battery = live.battery;
     }
   } catch {
-    /* 轮询失败保持安静，用户点「重新读取」时再报错 */
+    /* 轮询失败保持安静 */
   }
 }
 
-export async function apply() {
-  if (!device.current || !draft.config || !draft.buttons) return;
-  if (!device.current.online) {
-    setError(new ApiFailure('offline', '鼠标正在休眠，先移动鼠标唤醒再写入'), '无法写入');
-    return;
-  }
-  if (!isDirty()) {
-    showToast('没有需要写入的更改');
-    return;
-  }
-
-  device.busy = 'applying';
-  clearError();
+export async function disconnect(kind?: DeviceKind) {
   try {
-    const snap = await api.applyConfig(cloneConfig(draft.config), [...draft.buttons]);
-    device.current = snap;
-    resetDraftFrom(snap);
-    showToast('已写入鼠标，并保存到板载 Flash');
-  } catch (e) {
-    setError(e, '写入失败');
-    showToast('写入失败');
-  } finally {
-    device.busy = null;
-  }
-}
-
-export function revertDraft() {
-  resetDraftFrom(device.current);
-  showToast('已还原为设备当前配置');
-}
-
-export function restoreFactory() {
-  const snap = device.current;
-  if (!snap) return;
-  draft.config = cloneConfig(snap.factoryConfig);
-  draft.buttons = [...snap.factoryButtons];
-  showToast('已填入原厂默认值，写入后生效');
-}
-
-export async function disconnect() {
-  try {
-    await api.disconnect();
+    await api.disconnect(kind);
   } catch {
-    /* 关连接失败也把界面复位 */
+    /* 关连接失败也复位界面 */
   }
-  device.current = null;
-  resetDraftFrom(null);
-  await scan(false);
-  showToast('已断开设备');
-}
-
-export async function setDemoMode(enabled: boolean) {
-  prefs.demoMode = enabled;
-  persistPrefs();
-  device.busy = 'scanning';
-  clearError();
-  try {
-    await api.setDemoMode(enabled);
+  const target = kind ?? device.active;
+  if (target === 'keyboard') {
+    device.keyboard = null;
+  } else {
+    device.mouse = null;
     device.current = null;
-    resetDraftFrom(null);
-    await scan(false);
-    await autoConnect();
-    showToast(enabled ? '已进入演示模式（不碰真实硬件）' : '已退出演示模式');
-  } catch (e) {
-    setError(e, '切换演示模式失败');
-  } finally {
-    device.busy = null;
   }
+  syncActive();
+  await scan(false);
+  showToast(target === 'keyboard' ? '已断开键盘' : '已断开鼠标');
 }
 
 export async function setShowUnknown(show: boolean) {
@@ -261,133 +292,234 @@ export async function setShowUnknown(show: boolean) {
 }
 
 // ---------------------------------------------------------------------------
-// 编辑动作
+// 鼠标：改动即时写入
 // ---------------------------------------------------------------------------
 
-export function caps() {
-  return device.current?.info.capabilities ?? null;
-}
-
-function editableConfig(): MouseConfig | null {
-  if (!device.current?.online || device.busy === 'applying') return null;
-  return draft.config;
-}
-
-export function setStageCount(n: number) {
-  const cfg = editableConfig();
-  const c = caps();
-  if (!cfg || !c?.dpi) return;
-  cfg.stageCount = clamp(n, 1, c.maxStages);
-  if (cfg.activeStage > cfg.stageCount) cfg.activeStage = cfg.stageCount;
-}
-
-export function setActiveStage(n: number) {
-  const cfg = editableConfig();
-  const c = caps();
-  if (!cfg || !c?.dpi) return;
-  cfg.activeStage = clamp(n, 1, cfg.stageCount);
-}
-
-export function setDpi(index: number, value: number) {
-  const cfg = editableConfig();
-  const c = caps();
-  if (!cfg || !c?.dpi) return;
-  const { min, max, step } = c.dpiRange;
-  const snapped = Math.round(value / step) * step;
-  cfg.stages[index] = clamp(snapped, min, max);
-}
-
-export function nudgeDpi(index: number, delta: number) {
-  const cfg = editableConfig();
-  const c = caps();
-  if (!cfg || !c?.dpi) return;
-  setDpi(index, cfg.stages[index] + delta);
-}
-
-export function setPolling(hz: number) {
-  const cfg = editableConfig();
-  if (!cfg || !caps()?.polling) return;
-  cfg.pollingHz = hz;
-}
-
-export function setDebounce(ms: number) {
-  const cfg = editableConfig();
-  if (!cfg || !caps()?.debounce) return;
-  cfg.debounceMs = clamp(Math.round(ms), 0, 20);
-}
-
-export function setSleep(minutes: number) {
-  const cfg = editableConfig();
-  if (!cfg || !caps()?.sleep) return;
-  cfg.sleepMinutes = clamp(Math.round(minutes), 0, 100);
-}
-
-export function setLod(lod: 'low' | 'high') {
-  const cfg = editableConfig();
-  if (!cfg || !caps()?.lod) return;
-  cfg.lod = lod;
-}
-
-export function setScrollReversed(reversed: boolean) {
-  const cfg = editableConfig();
-  if (!cfg || !caps()?.scrollDirection) return;
-  cfg.scrollReversed = reversed;
-}
-
-export function setButton(index: number, action: ButtonAction) {
-  if (index === 0) return; // 左键由固件锁死
-  const buttons = draft.buttons;
-  if (!buttons || !device.current?.online || !caps()?.buttons) return;
-  buttons[index] = action;
-}
-
-// ---------------------------------------------------------------------------
-// 草稿差异
-// ---------------------------------------------------------------------------
-
-function sameArray<T>(a: readonly T[], b: readonly T[]): boolean {
-  return a.length === b.length && a.every((v, i) => v === b[i]);
-}
-
-/** 每一组改动单独计数，底栏用它显示「N 项未写入」。 */
-export function diffItems(): string[] {
-  const saved = device.current?.config;
-  const cfg = draft.config;
-  const savedButtons = device.current?.buttons;
-  const buttons = draft.buttons;
-  if (!saved || !cfg) return [];
-
-  const items: string[] = [];
-  if (
-    saved.stageCount !== cfg.stageCount ||
-    saved.activeStage !== cfg.activeStage ||
-    !sameArray(saved.stages, cfg.stages)
-  ) {
-    items.push('DPI');
-  }
-  if (saved.pollingHz !== cfg.pollingHz) items.push('回报率');
-  if (saved.debounceMs !== cfg.debounceMs) items.push('防抖');
-  if (saved.sleepMinutes !== cfg.sleepMinutes) items.push('休眠');
-  if (saved.lod !== cfg.lod) items.push('静默高度');
-  if (saved.scrollReversed !== cfg.scrollReversed) items.push('滚轮方向');
-  if (savedButtons && buttons && !sameArray(savedButtons, buttons)) items.push('按键');
-  return items;
-}
-
-export function isDirty(): boolean {
-  return diffItems().length > 0;
-}
-
-export function isOnline(): boolean {
-  return !!device.current?.online;
+function mouse(): Snapshot | null {
+  return device.mouse;
 }
 
 export function canEdit(): boolean {
-  return !!device.current?.online && !!draft.config && device.busy !== 'applying';
+  return !!device.mouse?.online && !!device.mouse?.config;
 }
 
-export function canApply(): boolean {
-  return canEdit() && isDirty();
+function scheduleMouseSave() {
+  if (!device.mouse) return;
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => void flushMouse(), 320);
+}
+
+async function flushMouse() {
+  saveTimer = null;
+  const snap = device.mouse;
+  if (!snap?.config) return;
+  const config: MouseConfig = cloneConfig(snap.config);
+  const buttons: ButtonAction[] = snap.buttons ? [...snap.buttons] : [];
+  beginSave();
+  try {
+    const next = await api.applyConfig(config, buttons);
+    if (device.mouse) {
+      device.mouse.info = next.info;
+      device.mouse.online = next.online;
+      device.mouse.battery = next.battery;
+      device.mouse.readAt = next.readAt;
+      // 写入期间用户可能又改了别的值，只在没有新改动时采用回读值。
+      if (device.mouse.config && sameConfig(device.mouse.config, config)) {
+        device.mouse.config = next.config;
+        device.mouse.buttons = next.buttons;
+      }
+    }
+    clearError();
+    endSave();
+  } catch (e) {
+    setError(e, '写入鼠标失败');
+    device.saveState = 'error';
+    savesInFlight = 0;
+    showToast('写入鼠标失败');
+  }
+}
+
+function sameConfig(a: MouseConfig, b: MouseConfig): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+export function setStageCount(n: number) {
+  const m = mouse();
+  const c = m?.info.capabilities;
+  if (!m?.config || !c?.dpi) return;
+  m.config.stageCount = clamp(n, 1, c.maxStages);
+  if (m.config.activeStage > m.config.stageCount) m.config.activeStage = m.config.stageCount;
+  scheduleMouseSave();
+}
+
+export function setActiveStage(n: number) {
+  const m = mouse();
+  if (!m?.config) return;
+  m.config.activeStage = clamp(n, 1, m.config.stageCount);
+  scheduleMouseSave();
+}
+
+export function setDpi(index: number, value: number) {
+  const m = mouse();
+  const c = m?.info.capabilities;
+  if (!m?.config || !c?.dpi) return;
+  const { min, max, step } = c.dpiRange;
+  const snapped = Math.round(value / step) * step;
+  m.config.stages[index] = clamp(snapped, min, max);
+  scheduleMouseSave();
+}
+
+export function nudgeDpi(index: number, delta: number) {
+  const m = mouse();
+  if (!m?.config) return;
+  setDpi(index, m.config.stages[index] + delta);
+}
+
+export function setPolling(hz: number) {
+  const m = mouse();
+  if (!m?.config || !m.info.capabilities.polling) return;
+  m.config.pollingHz = hz;
+  scheduleMouseSave();
+}
+
+export function setDebounce(ms: number) {
+  const m = mouse();
+  if (!m?.config || !m.info.capabilities.debounce) return;
+  m.config.debounceMs = clamp(Math.round(ms), 0, 20);
+  scheduleMouseSave();
+}
+
+export function setSleep(minutes: number) {
+  const m = mouse();
+  if (!m?.config || !m.info.capabilities.sleep) return;
+  m.config.sleepMinutes = clamp(Math.round(minutes), 0, 100);
+  scheduleMouseSave();
+}
+
+export function setLod(lod: 'low' | 'high') {
+  const m = mouse();
+  if (!m?.config || !m.info.capabilities.lod) return;
+  m.config.lod = lod;
+  scheduleMouseSave();
+}
+
+export function setScrollReversed(reversed: boolean) {
+  const m = mouse();
+  if (!m?.config || !m.info.capabilities.scrollDirection) return;
+  m.config.scrollReversed = reversed;
+  scheduleMouseSave();
+}
+
+export function setButton(index: number, action: ButtonAction) {
+  const m = mouse();
+  if (!m?.buttons || index === 0 || !m.info.capabilities.buttons) return;
+  m.buttons[index] = action;
+  scheduleMouseSave();
+}
+
+export function restoreFactory() {
+  const m = mouse();
+  if (!m?.config) return;
+  m.config = cloneConfig(m.factoryConfig);
+  if (m.factoryButtons.length === 5) m.buttons = [...m.factoryButtons];
+  scheduleMouseSave();
+  showToast('已恢复默认值，正在写入设备');
+}
+
+// ---------------------------------------------------------------------------
+// 键盘：改动即时写入
+// ---------------------------------------------------------------------------
+
+export function canEditKeyboard(): boolean {
+  return !!device.keyboard?.online;
+}
+
+function scheduleKeyboardSave() {
+  if (!device.keyboard) return;
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => void flushKeyboard(), 450);
+}
+
+function clonePerformance(p: KeyboardPerformance): KeyboardPerformance {
+  return { ...p, color: [...p.color] as [number, number, number] };
+}
+
+function cloneLayers(
+  layers: [number, number, number, number][][],
+): [number, number, number, number][][] {
+  return layers.map((layer) =>
+    layer.map((c) => [...c] as [number, number, number, number]),
+  );
+}
+
+async function flushKeyboard() {
+  saveTimer = null;
+  const kb = device.keyboard;
+  if (!kb) return;
+  const input: KeyboardInput = {
+    performance: clonePerformance(kb.performance),
+    layers: cloneLayers(kb.layers),
+  };
+  beginSave();
+  try {
+    const next = await api.applyKeyboard(input);
+    if (device.keyboard) {
+      device.keyboard.info = next.info;
+      device.keyboard.online = next.online;
+      device.keyboard.battery = next.battery;
+      device.keyboard.readAt = next.readAt;
+      // 回读的层/性能以设备为准；如果用户刚好又改了，下一轮再写入。
+      if (JSON.stringify(device.keyboard.performance) === JSON.stringify(input.performance)) {
+        device.keyboard.performance = next.performance;
+      }
+      if (JSON.stringify(device.keyboard.layers) === JSON.stringify(input.layers)) {
+        device.keyboard.layers = next.layers;
+      }
+    }
+    clearError();
+    endSave();
+  } catch (e) {
+    setError(e, '写入键盘失败');
+    device.saveState = 'error';
+    savesInFlight = 0;
+    showToast('写入键盘失败');
+  }
+}
+
+export function setKeyboardPerformance(patch: Partial<KeyboardPerformance>) {
+  const kb = device.keyboard;
+  if (!kb) return;
+  Object.assign(kb.performance, patch);
+  scheduleKeyboardSave();
+}
+
+export function setLightMode(mode: number) {
+  const kb = device.keyboard;
+  if (!kb) return;
+  kb.performance.lightMode = mode;
+  scheduleKeyboardSave();
+}
+
+export function setLightColor(rgb: [number, number, number]) {
+  const kb = device.keyboard;
+  if (!kb) return;
+  kb.performance.color = rgb;
+  scheduleKeyboardSave();
+}
+
+export function setKey(layer: number, index: number, code: [number, number, number, number]) {
+  const kb = device.keyboard;
+  if (!kb?.layers[layer] || index < 0 || index >= kb.layers[layer].length) return;
+  kb.layers[layer][index] = [...code] as [number, number, number, number];
+  scheduleKeyboardSave();
+}
+
+export function restoreKeyboardLayer(layer: number, defaults: [number, number, number, number][]) {
+  const kb = device.keyboard;
+  if (!kb?.layers[layer]) return;
+  kb.layers[layer] = defaults.map((c) => [...c] as [number, number, number, number]);
+  scheduleKeyboardSave();
+  showToast('已恢复本层默认按键，正在写入键盘');
 }
 
 // ---------------------------------------------------------------------------
@@ -395,34 +527,42 @@ export function canApply(): boolean {
 // ---------------------------------------------------------------------------
 
 export function diagnosticsText(): string {
-  const snap = device.current;
-  if (!snap) return 'MHUB Lite — 未连接设备';
-  const c = snap.config;
   const lines = [
     'MHUB Lite 诊断信息',
     `版本: ${device.version}`,
     `平台: ${navigator.userAgent}`,
-    `设备: ${snap.info.productName} (${snap.info.model ?? '未知型号'})`,
-    `VID:PID: ${snap.info.vendorId.toString(16).toUpperCase()}:${snap.info.productId.toString(16).toUpperCase()}`,
-    `连接: ${connectionLabel(snap.info.connection)}`,
-    `固件: ${snap.info.firmware ?? '未知'} / ${snap.info.buildDate ?? '未知'}`,
-    `序列号: ${snap.info.serial ?? '无'}`,
-    `在线: ${snap.online ? '是' : '否'}`,
-    `电量: ${snap.battery ? `${snap.battery.percent}%${snap.battery.charging ? '（充电中）' : ''}` : '未知'}`,
+    `活动设备: ${device.active ?? '无'}`,
   ];
-  if (c) {
+  const snap = device.mouse;
+  if (snap) {
+    const c = snap.config;
     lines.push(
-      `回报率: ${formatHz(c.pollingHz)}`,
-      `DPI 档位: ${c.stageCount} / 当前第 ${c.activeStage} 档`,
-      `各档 DPI: ${c.stages.slice(0, c.stageCount).join(' / ')}`,
-      `防抖: ${c.debounceMs} ms`,
-      `休眠: ${formatMinutes(c.sleepMinutes)}`,
-      `静默高度: ${c.lod === 'low' ? '1 mm' : '2 mm'}`,
-      `滚轮方向: ${c.scrollReversed ? '反转' : '标准'}`,
+      `鼠标: ${snap.info.productName} (${snap.info.model ?? '未知型号'})`,
+      `VID:PID: ${snap.info.vendorId.toString(16).toUpperCase()}:${snap.info.productId.toString(16).toUpperCase()}`,
+      `连接: ${connectionLabel(snap.info.connection)}`,
+      `固件: ${snap.info.firmware ?? '未知'}`,
+      `在线: ${snap.online ? '是' : '否'}`,
+      `电量: ${snap.battery ? `${snap.battery.percent}%${snap.battery.charging ? '（充电中）' : ''}` : '未知'}`,
+    );
+    if (c) {
+      lines.push(
+        `回报率: ${formatHz(c.pollingHz)}`,
+        `DPI 档位: ${c.stageCount} / 当前第 ${c.activeStage} 档`,
+        `各档 DPI: ${c.stages.slice(0, c.stageCount).join(' / ')}`,
+        `防抖: ${c.debounceMs} ms`,
+        `休眠: ${formatMinutes(c.sleepMinutes)}`,
+      );
+    }
+  }
+  const kb = device.keyboard;
+  if (kb) {
+    lines.push(
+      `键盘: ${kb.info.productName} (${kb.info.model ?? '未知型号'})`,
+      `键盘电量: ${kb.battery ? `${kb.battery.percent}%${kb.battery.charging ? '（充电中）' : ''}` : '未知'}`,
+      `回报率: ${formatHz(kb.performance.rateHz)}`,
+      `灯效: ${kb.performance.lightMode} / 亮度 ${kb.performance.brightness}`,
+      `休眠: ${formatMinutes(kb.performance.sleepMinutes)}`,
     );
   }
-  if (snap.buttons) lines.push(`按键: ${snap.buttons.join(' / ')}`);
-  const diff = diffItems();
-  if (diff.length) lines.push(`未写入: ${diff.join('、')}`);
   return lines.join('\n');
 }

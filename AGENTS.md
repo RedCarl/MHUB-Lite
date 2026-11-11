@@ -2,7 +2,8 @@
 
 ## 项目结构
 
-- `core/`：Rust 协议层 `mhub-core`，不依赖 Tauri，可在无窗口、无外设的机器上测试。
+- `core/`：Rust 协议层 `mhub-core`，不依赖 Tauri。G3 V2（0x55）、A7 V3 Ultra+（0x4D）和 K99 V2（0x13 无线包）各自独立模块。
+- 已实机验证：A7 V3 Ultra+ 的读取与 DPI 写入、K99 V2 2.4G 的键层写入。G3 V2 协议保留，但本机没有实机。
 - `src-tauri/`：Tauri 2 外壳，命令、窗口与应用状态。
 - `src/`：Svelte 5 前端；`app.css` 是设计系统，`routes/` 是五个页面，`lib/` 是状态与 API。
 - `docs/`：协议与设计说明；`screenshots/`：README 用截图。
@@ -23,7 +24,10 @@
 ## 安全边界（重要）
 
 - **没有实机验证的型号不得打开写入。** 未知 PID 只列出识别信息。
+- A7 的 DPI 读包和写包字段顺序不同（见 `docs/protocol.md`），必须用 `encode_dpi_payload`，不能把读回数组直接写回。
+- K99 V2 的键层/灯效是整块覆盖：先读、只改目标字段、再写；写命令之间至少 1.2 秒。
 - 所有写入参数在 Rust 侧再次校验，不信任前端。
+- 修改即时写入，不做草稿/应用两段式；连续修改由前端 300–450ms 合并，并由后端串行化。
 - 保持界面未开放字段（`sensorFlags` / `highspeedMode` / `sensorAngle`）原样读写。
 - 新增型号时同步更新 `docs/protocol.md`、README 支持表和测试。
 
@@ -34,6 +38,5 @@ cargo test -p mhub-core
 cargo clippy -p mhub-core --all-targets -- -D warnings
 pnpm check
 pnpm build
-pnpm tauri dev          # 有硬件时
-MHUB_DEMO=1 pnpm tauri dev
+pnpm tauri dev          # 直接连接真实设备
 ```

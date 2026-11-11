@@ -1,6 +1,7 @@
+use mhub_core::keyboard::{KeyboardDevice, KeyboardInput, KeyboardSnapshot};
 use mhub_core::{
-    demo_summary, scan_devices as scan_hid_devices, ButtonAction, Device, DeviceError,
-    DeviceSummary, ErrorCode, LiveStatus, MouseConfig, Snapshot,
+    ButtonAction, DeviceError, DeviceSummary, ErrorCode, LiveStatus, MouseConfig, MouseDevice,
+    Snapshot,
 };
 use serde::Serialize;
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -29,17 +30,17 @@ fn busy(message: impl Into<String>) -> ApiError {
     }
 }
 
-fn not_connected() -> ApiError {
+fn not_connected(what: &str) -> ApiError {
     ApiError {
         code: ErrorCode::Offline,
-        message: "还没有连接设备".into(),
+        message: format!("还没有连接{what}"),
     }
 }
 
 struct Inner {
-    device: Option<Device>,
+    mouse: Option<MouseDevice>,
+    keyboard: Option<KeyboardDevice>,
     saved: Option<Snapshot>,
-    demo: bool,
 }
 
 #[derive(Clone)]
@@ -48,12 +49,12 @@ pub struct AppState {
 }
 
 impl AppState {
-    fn new(demo: bool) -> Self {
+    fn new() -> Self {
         Self {
             inner: Arc::new(Mutex::new(Inner {
-                device: None,
+                mouse: None,
+                keyboard: None,
                 saved: None,
-                demo,
             })),
         }
     }
@@ -80,15 +81,15 @@ async fn scan_devices(
     state: State<'_, AppState>,
     include_unknown: Option<bool>,
 ) -> Result<Vec<DeviceSummary>, ApiError> {
-    let inner = state.inner.clone();
+    let _ = state;
     blocking(move || {
-        let demo = lock(&inner)?.demo;
-        if demo {
-            return Ok(vec![demo_summary()]);
-        }
         let mut devices =
-            scan_hid_devices(include_unknown.unwrap_or(true)).map_err(ApiError::from)?;
-        devices.shrink_to_fit();
+            mhub_core::scan_mice(include_unknown.unwrap_or(true)).map_err(ApiError::from)?;
+        // 键盘扫描失败（例如权限不足）不应该让鼠标列表整页消失。
+        if let Ok(mut keyboards) = mhub_core::keyboard::scan() {
+            devices.append(&mut keyboards);
+        }
+        devices.sort_by_key(|d| (d.kind as u8, !d.supported));
         Ok(devices)
     })
     .await
@@ -96,14 +97,29 @@ async fn scan_devices(
 
 #[tauri::command]
 async fn connect(state: State<'_, AppState>, key: String) -> Result<Snapshot, ApiError> {
+    if key.starts_with("kb:") {
+        return Err(ApiError {
+            code: ErrorCode::Invalid,
+            message: "这是键盘设备，请使用键盘连接".into(),
+        });
+    }
     let inner = state.inner.clone();
     blocking(move || {
-        let demo = lock(&inner)?.demo;
-        let mut device = Device::open(&key, demo).map_err(ApiError::from)?;
+        {
+            let mut guard = lock(&inner)?;
+            if let Some(existing) = guard.mouse.as_mut() {
+                if existing.info().key == key {
+                    return existing.snapshot().map_err(ApiError::from);
+                }
+            }
+            // 释放上一只设备，避免再次打开时被 macOS 的独占访问拦住
+            guard.mouse = None;
+            guard.saved = None;
+        }
+        let mut device = MouseDevice::open(&key).map_err(ApiError::from)?;
         let snapshot = device.snapshot();
-
         let mut guard = lock(&inner)?;
-        guard.device = Some(device);
+        guard.mouse = Some(device);
         match snapshot {
             Ok(snap) => {
                 guard.saved = Some(snap.clone());
@@ -116,12 +132,41 @@ async fn connect(state: State<'_, AppState>, key: String) -> Result<Snapshot, Ap
 }
 
 #[tauri::command]
-async fn disconnect(state: State<'_, AppState>) -> Result<(), ApiError> {
+async fn connect_keyboard(
+    state: State<'_, AppState>,
+    key: String,
+) -> Result<KeyboardSnapshot, ApiError> {
+    let inner = state.inner.clone();
+    blocking(move || {
+        {
+            let mut guard = lock(&inner)?;
+            if let Some(existing) = guard.keyboard.as_mut() {
+                if existing.info.key == key {
+                    return Ok(existing.snapshot());
+                }
+            }
+            guard.keyboard = None;
+        }
+        let device = KeyboardDevice::open(&key).map_err(ApiError::from)?;
+        let snapshot = device.snapshot();
+        let mut guard = lock(&inner)?;
+        guard.keyboard = Some(device);
+        Ok(snapshot)
+    })
+    .await
+}
+
+#[tauri::command]
+async fn disconnect(state: State<'_, AppState>, kind: Option<String>) -> Result<(), ApiError> {
     let inner = state.inner.clone();
     blocking(move || {
         let mut guard = lock(&inner)?;
-        guard.device = None;
-        guard.saved = None;
+        if kind.as_deref() == Some("keyboard") {
+            guard.keyboard = None;
+        } else {
+            guard.mouse = None;
+            guard.saved = None;
+        }
         Ok(())
     })
     .await
@@ -132,10 +177,28 @@ async fn refresh(state: State<'_, AppState>) -> Result<Snapshot, ApiError> {
     let inner = state.inner.clone();
     blocking(move || {
         let mut guard = lock(&inner)?;
-        let device = guard.device.as_mut().ok_or_else(not_connected)?;
-        let snap = device.snapshot().map_err(ApiError::from)?;
+        let saved = guard.saved.clone();
+        let snap = {
+            let device = guard.mouse.as_mut().ok_or_else(|| not_connected("鼠标"))?;
+            device.snapshot().map_err(ApiError::from)?
+        };
+        let _ = saved;
         guard.saved = Some(snap.clone());
         Ok(snap)
+    })
+    .await
+}
+
+#[tauri::command]
+async fn refresh_keyboard(state: State<'_, AppState>) -> Result<KeyboardSnapshot, ApiError> {
+    let inner = state.inner.clone();
+    blocking(move || {
+        let mut guard = lock(&inner)?;
+        let device = guard
+            .keyboard
+            .as_mut()
+            .ok_or_else(|| not_connected("键盘"))?;
+        device.refresh().map_err(ApiError::from)
     })
     .await
 }
@@ -145,7 +208,21 @@ async fn live_status(state: State<'_, AppState>) -> Result<LiveStatus, ApiError>
     let inner = state.inner.clone();
     blocking(move || {
         let mut guard = lock(&inner)?;
-        let device = guard.device.as_mut().ok_or_else(not_connected)?;
+        let device = guard.mouse.as_mut().ok_or_else(|| not_connected("鼠标"))?;
+        device.read_live().map_err(ApiError::from)
+    })
+    .await
+}
+
+#[tauri::command]
+async fn keyboard_live(state: State<'_, AppState>) -> Result<LiveStatus, ApiError> {
+    let inner = state.inner.clone();
+    blocking(move || {
+        let mut guard = lock(&inner)?;
+        let device = guard
+            .keyboard
+            .as_mut()
+            .ok_or_else(|| not_connected("键盘"))?;
         device.read_live().map_err(ApiError::from)
     })
     .await
@@ -159,42 +236,20 @@ async fn apply_config(
 ) -> Result<Snapshot, ApiError> {
     let inner = state.inner.clone();
     blocking(move || {
-        if buttons.len() != 5 {
+        if !buttons.is_empty() && buttons.len() != 5 {
             return Err(ApiError {
                 code: ErrorCode::Invalid,
                 message: "按键映射必须正好 5 项".into(),
             });
         }
-        let mut arr = [ButtonAction::Left; 5];
-        arr.copy_from_slice(&buttons);
-
         let mut guard = lock(&inner)?;
-
-        // 比较对象是「上一次从设备读回来的样子」，
-        // 这样只改 DPI 时不会顺手把按键区重写一遍（写按键会让 HID 端点短暂重枚举）。
         let saved = guard.saved.clone();
-        let config_changed = saved
-            .as_ref()
-            .and_then(|s| s.config.as_ref())
-            .map(|c| c != &config)
-            .unwrap_or(true);
-        let buttons_changed = saved
-            .as_ref()
-            .and_then(|s| s.buttons.as_ref())
-            .map(|b| b != &buttons)
-            .unwrap_or(true);
-
         let snap = {
-            let device = guard.device.as_mut().ok_or_else(not_connected)?;
-            if config_changed {
-                device.set_config(&config).map_err(ApiError::from)?;
-            }
-            if buttons_changed {
-                device.set_buttons(&arr).map_err(ApiError::from)?;
-            }
-            device.snapshot().map_err(ApiError::from)?
+            let device = guard.mouse.as_mut().ok_or_else(|| not_connected("鼠标"))?;
+            device
+                .apply(&config, &buttons, saved.as_ref())
+                .map_err(ApiError::from)?
         };
-
         guard.saved = Some(snap.clone());
         Ok(snap)
     })
@@ -202,14 +257,18 @@ async fn apply_config(
 }
 
 #[tauri::command]
-async fn set_demo_mode(state: State<'_, AppState>, enabled: bool) -> Result<(), ApiError> {
+async fn apply_keyboard(
+    state: State<'_, AppState>,
+    input: KeyboardInput,
+) -> Result<KeyboardSnapshot, ApiError> {
     let inner = state.inner.clone();
     blocking(move || {
         let mut guard = lock(&inner)?;
-        guard.demo = enabled;
-        guard.device = None;
-        guard.saved = None;
-        Ok(())
+        let device = guard
+            .keyboard
+            .as_mut()
+            .ok_or_else(|| not_connected("键盘"))?;
+        device.apply(&input).map_err(ApiError::from)
     })
     .await
 }
@@ -221,12 +280,7 @@ fn app_version() -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let demo = std::env::var("MHUB_DEMO")
-        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
-        .unwrap_or(false);
-
     tauri::Builder::default()
-        // 只允许一个实例：两个窗口同时写同一只鼠标的板载 Flash 不是好主意。
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.unminimize();
@@ -234,15 +288,18 @@ pub fn run() {
                 let _ = window.set_focus();
             }
         }))
-        .manage(AppState::new(demo))
+        .manage(AppState::new())
         .invoke_handler(tauri::generate_handler![
             scan_devices,
             connect,
+            connect_keyboard,
             disconnect,
             refresh,
+            refresh_keyboard,
             live_status,
+            keyboard_live,
             apply_config,
-            set_demo_mode,
+            apply_keyboard,
             app_version
         ])
         .run(tauri::generate_context!())

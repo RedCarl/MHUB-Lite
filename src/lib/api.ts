@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 
+export type DeviceKind = 'mouse' | 'keyboard';
 export type ConnectionKind = 'wired' | 'wireless' | 'unknown';
 export type Lod = 'low' | 'high';
 export type ButtonAction =
@@ -57,6 +58,7 @@ export type Battery = { percent: number; charging: boolean };
 
 export type DeviceInfo = {
   key: string;
+  kind: DeviceKind;
   model: string | null;
   productName: string;
   vendorId: number;
@@ -73,6 +75,7 @@ export type DeviceInfo = {
 
 export type DeviceSummary = {
   key: string;
+  kind: DeviceKind;
   name: string;
   model: string | null;
   serial: string | null;
@@ -95,6 +98,43 @@ export type Snapshot = {
   factoryConfig: MouseConfig;
   factoryButtons: ButtonAction[];
   readAt: number;
+};
+
+export type LightModeInfo = {
+  id: number;
+  name: string;
+  brightness: boolean;
+  speed: boolean;
+  color: boolean;
+};
+
+export type KeyboardPerformance = {
+  rateHz: number;
+  sleepMinutes: number;
+  latency: 'speed' | 'standard' | 'special' | string;
+  winKeyLocked: boolean;
+  macMode: boolean;
+  lightType: number;
+  lightMode: number;
+  brightness: number;
+  speed: number;
+  multiColor: boolean;
+  color: [number, number, number];
+};
+
+export type KeyboardSnapshot = {
+  info: DeviceInfo;
+  online: boolean;
+  battery: Battery | null;
+  performance: KeyboardPerformance;
+  layers: [number, number, number, number][][];
+  lightModes: LightModeInfo[];
+  readAt: number;
+};
+
+export type KeyboardInput = {
+  performance: KeyboardPerformance;
+  layers: [number, number, number, number][][];
 };
 
 export class ApiFailure extends Error {
@@ -180,6 +220,7 @@ let mockConnected = false;
 function mockInfo(): DeviceInfo {
   return {
     key: 'demo',
+    kind: 'mouse',
     model: 'mchose-g3-v2',
     productName: 'MCHOSE G3 V2',
     vendorId: 0x3837,
@@ -232,6 +273,73 @@ function mockValidate(config: MouseConfig) {
   }
 }
 
+let mockKbConnected = false;
+let mockKbPerformance: KeyboardPerformance = {
+  rateHz: 1000,
+  sleepMinutes: 3,
+  latency: 'standard',
+  winKeyLocked: false,
+  macMode: false,
+  lightType: 0,
+  lightMode: 11,
+  brightness: 60,
+  speed: 2,
+  multiColor: true,
+  color: [255, 60, 60],
+};
+let mockKbLayers: [number, number, number, number][][] = [
+  Array.from({ length: 113 }, () => [0, 0, 0, 0] as [number, number, number, number]),
+  Array.from({ length: 113 }, () => [0, 0, 0, 0] as [number, number, number, number]),
+  Array.from({ length: 113 }, () => [0, 0, 0, 0] as [number, number, number, number]),
+];
+
+function mockKbInfo(): DeviceInfo {
+  return {
+    key: 'kb-demo',
+    kind: 'keyboard',
+    model: 'K99 V2',
+    productName: 'MCHOSE 2.4G Wireless',
+    vendorId: 0x41e4,
+    productId: 0x2001,
+    serial: '',
+    connection: 'wireless',
+    supported: true,
+    capabilities: {
+      ...DEMO_CAPABILITIES,
+      dpi: false,
+      polling: false,
+      debounce: false,
+      sleep: false,
+      lod: false,
+      buttons: false,
+      scrollDirection: false,
+      firmware: false,
+      pollingRates: [],
+      maxStages: 0,
+    },
+    firmware: null,
+    buildDate: null,
+    isDemo: true,
+    note: null,
+  };
+}
+
+function mockKbSnapshot(): KeyboardSnapshot {
+  return {
+    info: mockKbInfo(),
+    online: true,
+    battery: { percent: 95, charging: true },
+    performance: { ...mockKbPerformance, color: [...mockKbPerformance.color] as [number, number, number] },
+    layers: mockKbLayers.map((layer) => layer.map((c) => [...c] as [number, number, number, number])),
+    lightModes: [
+      { id: 1, name: '常亮', brightness: true, speed: false, color: true },
+      { id: 2, name: '呼吸', brightness: true, speed: true, color: true },
+      { id: 11, name: '随波逐流', brightness: true, speed: true, color: true },
+    ],
+    readAt: Math.floor(Date.now() / 1000),
+  };
+}
+
 async function mockCall<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   await new Promise((r) => setTimeout(r, cmd === 'connect' || cmd === 'refresh' ? 260 : 60));
   switch (cmd) {
@@ -239,6 +347,7 @@ async function mockCall<T>(cmd: string, args?: Record<string, unknown>): Promise
       return [
         {
           key: 'demo',
+          kind: 'mouse',
           name: 'MCHOSE G3 V2',
           model: 'mchose-g3-v2',
           serial: 'DEMO-0001',
@@ -246,7 +355,20 @@ async function mockCall<T>(cmd: string, args?: Record<string, unknown>): Promise
           productId: 0x4245,
           connection: 'wireless',
           supported: true,
-          statusNote: '浏览器演示数据',
+          statusNote: '浏览器预览数据',
+          isDemo: true,
+        },
+        {
+          key: 'kb-demo',
+          kind: 'keyboard',
+          name: 'MCHOSE 2.4G Wireless',
+          model: 'K99 V2',
+          serial: '',
+          vendorId: 0x41e4,
+          productId: 0x2001,
+          connection: 'wireless',
+          supported: true,
+          statusNote: '浏览器预览数据',
           isDemo: true,
         },
       ] as T;
@@ -254,6 +376,22 @@ async function mockCall<T>(cmd: string, args?: Record<string, unknown>): Promise
       mockConnected = true;
       mockOnline = true;
       return mockSnapshot() as T;
+    case 'connect_keyboard':
+      mockKbConnected = true;
+      return mockKbSnapshot() as T;
+    case 'refresh_keyboard':
+      if (!mockKbConnected) throw new ApiFailure('offline', '还没有连接键盘');
+      return mockKbSnapshot() as T;
+    case 'keyboard_live':
+      if (!mockKbConnected) throw new ApiFailure('offline', '还没有连接键盘');
+      return { online: true, battery: mockKbSnapshot().battery } as T;
+    case 'apply_keyboard': {
+      if (!mockKbConnected) throw new ApiFailure('offline', '还没有连接键盘');
+      const input = args?.input as KeyboardInput;
+      mockKbPerformance = { ...input.performance, color: [...input.performance.color] as [number, number, number] };
+      mockKbLayers = input.layers.map((layer) => layer.map((c) => [...c] as [number, number, number, number]));
+      return mockKbSnapshot() as T;
+    }
     case 'disconnect':
       mockConnected = false;
       return undefined as T;
@@ -273,12 +411,10 @@ async function mockCall<T>(cmd: string, args?: Record<string, unknown>): Promise
       mockButtons = [...buttons];
       return mockSnapshot() as T;
     }
-    case 'set_demo_mode':
-      return undefined as T;
     case 'app_version':
       return '0.1.0' as T;
     default:
-      throw new ApiFailure('unsupported', `演示模式没有实现命令 ${cmd}`);
+      throw new ApiFailure('unsupported', `浏览器预览没有实现命令 ${cmd}`);
   }
 }
 
@@ -298,20 +434,29 @@ export const api = {
   connect(key: string) {
     return call<Snapshot>('connect', { key });
   },
-  disconnect() {
-    return call<void>('disconnect');
+  connectKeyboard(key: string) {
+    return call<KeyboardSnapshot>('connect_keyboard', { key });
+  },
+  disconnect(kind?: DeviceKind) {
+    return call<void>('disconnect', { kind });
   },
   refresh() {
     return call<Snapshot>('refresh');
   },
+  refreshKeyboard() {
+    return call<KeyboardSnapshot>('refresh_keyboard');
+  },
   liveStatus() {
     return call<LiveStatus>('live_status');
+  },
+  keyboardLive() {
+    return call<LiveStatus>('keyboard_live');
   },
   applyConfig(config: MouseConfig, buttons: ButtonAction[]) {
     return call<Snapshot>('apply_config', { config, buttons });
   },
-  setDemoMode(enabled: boolean) {
-    return call<void>('set_demo_mode', { enabled });
+  applyKeyboard(input: KeyboardInput) {
+    return call<KeyboardSnapshot>('apply_keyboard', { input });
   },
   appVersion() {
     return call<string>('app_version');
