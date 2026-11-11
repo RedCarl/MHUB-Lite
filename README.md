@@ -4,6 +4,8 @@
 
 直接通过 USB HID / 2.4G 接收器读写设备的板载配置。没有账号、没有云端、没有 Electron —— 一个窗口，几 MB 的原生应用。改动即时写入，不需要再点「应用」。
 
+**[下载最新版本](https://github.com/RedCarl/MHUB-Lite/releases/latest)** · macOS 11+ / Windows 10+
+
 ![MHUB Lite 鼠标概览](screenshots/mouse-overview.png)
 
 ---
@@ -141,6 +143,17 @@ sudo udevadm trigger
 
 ## 安装与运行
 
+### 直接下载
+
+到 [GitHub Releases](https://github.com/RedCarl/MHUB-Lite/releases/latest) 下载：
+
+- Windows：`MHUB Lite_<版本>_x64-setup.exe`，或 `.msi`
+- macOS：`MHUB Lite_<版本>_aarch64.dmg`（Apple 芯片）/ `_x64.dmg`（Intel）
+
+安装包没有开发者证书：macOS 首次打开若提示「已损坏」，在 Finder 里右键 → 打开；Windows SmartScreen 提示「未知发布者」时选择「仍要运行」。
+
+### 从源码构建
+
 需要 **Node.js 20+、pnpm、Rust stable**。
 
 ```bash
@@ -148,6 +161,16 @@ pnpm install
 pnpm tauri dev      # 开发（窗口 + 热更新）
 pnpm tauri build    # 打包当前平台的安装包
 ```
+
+### 发布
+
+推送 `v*` tag 会触发 GitHub Actions 的 `release` 工作流：在 macOS arm64、macOS x64 和 Windows x64 上分别构建，并把安装包上传到对应的 GitHub Release。
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
 
 协议测试不需要窗口或外设：
 

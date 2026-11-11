@@ -1,0 +1,75 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            target: aarch64-apple-darwin
+            label: macOS-arm64
+          - platform: macos-latest
+            target: x86_64-apple-darwin
+            label: macOS-x64
+          - platform: windows-latest
+            target: ''
+            label: Windows-x64
+
+    runs-on: ${{ matrix.platform }}
+    name: ${{ matrix.label }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ startsWith(matrix.target, 'aarch64') && 'aarch64-apple-darwin' || startsWith(matrix.target, 'x86_64-apple') && 'x86_64-apple-darwin' || '' }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: '. -> target'
+
+      - name: 安装前端依赖
+        run: pnpm install --frozen-lockfile
+
+      - name: 构建并发布
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # 给 .app 做完整的 ad-hoc 签名；不做的话只有 linker-signed 戳，
+          # 签名不覆盖 Resources，macOS 可能提示「应用已损坏」。
+          APPLE_SIGNING_IDENTITY: '-'
+        with:
+          tagName: v__VERSION__
+          releaseName: 'MHUB Lite v__VERSION__'
+          releaseBody: |
+            跨平台 MCHOSE 鼠标 / 键盘管理工具（Tauri 2 + Svelte 5）。
+
+            - Windows：`MHUB Lite_<版本>_x64-setup.exe`，或 `.msi`
+            - macOS：`MHUB Lite_<版本>_aarch64.dmg`（Apple 芯片）/ `_x64.dmg`（Intel）
+            - macOS 11+ / Windows 10+
+            - 安装包没有开发者证书；macOS 首次打开若提示「已损坏」，在 Finder 里右键 → 打开
+            - Windows SmartScreen 提示「未知发布者」时选择「仍要运行」
+
+            产品渲染图与 MCHOSE 商标归迈从科技所有，详见仓库 NOTICE。
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.target != '' && format('--target {0}', matrix.target) || '' }}
