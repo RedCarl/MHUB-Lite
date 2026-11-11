@@ -2,11 +2,7 @@ packages:
   - '.'
 
 allowBuilds:
-  '@hugeicons/svelte': set this to true or false
-  esbuild: set this to true or false
-
-onlyBuiltDependencies:
-  - esbuild
-  - '@hugeicons/svelte'
+  '@hugeicons/svelte': true
+  esbuild: true
 
 verifyDepsBeforeRun: false
