@@ -110,7 +110,8 @@ MCHOSE 网页驱动、MCHOSE HUB 或浏览器里的 WebHID 会独占接收器。
 ### macOS
 
 - macOS 11+；安装包没有公证，首次打开若提示「已损坏」，在 Finder 右键 → 打开。
-- 若系统询问「输入监控 / Input Monitoring」，允许后重新打开应用；hidapi 需要它访问厂商 HID 接口。
+- 键盘需要「输入监控 / Input Monitoring」权限。如果连接时提示 `not permitted`，打开
+  **系统设置 → 隐私与安全性 → 输入监控**，允许 MHUB Lite，然后重启应用。
 
 ### Windows
 

@@ -95,6 +95,11 @@ impl From<hidapi::HidError> for DeviceError {
                 "设备被其他程序独占：请关闭 MCHOSE HUB、浏览器里的 MCHOSE 网页驱动或其他占用 HID 的程序后重试",
             );
         }
+        if lower.contains("not permitted") {
+            return DeviceError::permission(
+                "macOS 拒绝访问设备 HID：请在「系统设置 → 隐私与安全性 → 输入监控」中允许 MHUB Lite，然后重启应用",
+            );
+        }
         if lower.contains("permission")
             || lower.contains("access")
             || lower.contains("not permitted")

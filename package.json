@@ -1,7 +1,7 @@
 {
   "name": "mhub-lite",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "description": "跨平台 MCHOSE 设备管理工具",
   "scripts": {
