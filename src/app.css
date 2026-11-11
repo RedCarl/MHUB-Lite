@@ -3453,3 +3453,60 @@ select:-webkit-autofill {
     radial-gradient(58% 76% at 50% 46%, color-mix(in oklch, var(--bg3) 70%, transparent), transparent 76%),
     linear-gradient(180deg, oklch(1 0 0 / 2%), transparent);
 }
+
+.settings-btn {
+  position: relative;
+}
+
+.settings-dot {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: var(--brand);
+  box-shadow: 0 0 0 2px var(--bg);
+}
+
+.st-btn.primary {
+  border-color: color-mix(in oklch, var(--brand) 55%, transparent);
+  background-color: color-mix(in oklch, var(--brand) 18%, var(--field));
+  color: var(--fg);
+}
+
+.st-value.new {
+  color: var(--brand);
+  font-weight: 600;
+}
+
+.update-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px 12px;
+  border-top: 1px solid var(--line);
+}
+
+.update-bar {
+  flex: 1;
+  height: 5px;
+  border-radius: 999px;
+  background-color: var(--field);
+  overflow: hidden;
+}
+
+.update-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background-color: var(--brand);
+  transition: width 160ms ease-out;
+}
+
+.update-error {
+  padding: 8px 16px 12px;
+  color: var(--danger);
+  font-size: 11px;
+  border-top: 1px solid var(--line);
+}

@@ -14,6 +14,9 @@
   import { theme, setTheme, type ThemeMode } from '../lib/theme.svelte';
   import { connectionLabel, hexId, timeAgo } from '../lib/format';
   import { copyText } from '../lib/toast.svelte';
+  import { check } from '@tauri-apps/plugin-updater';
+  import { relaunch } from '@tauri-apps/plugin-process';
+  import { pendingUpdate, setPendingUpdate, updateState } from '../lib/update.svelte';
   import Segmented from '../components/Segmented.svelte';
   import Toggle from '../components/Toggle.svelte';
 
@@ -21,6 +24,58 @@
   const kb = $derived(device.keyboard);
   const active = $derived(device.active);
   const cfg = $derived(mouse?.config);
+
+  let updBusy = $state(false);
+  let updMsg = $state('');
+  let updErr = $state('');
+  let progress = $state(0);
+  const pending = $derived(updateState.version ? pendingUpdate() : null);
+
+  async function checkUpdate() {
+    updBusy = true;
+    updErr = '';
+    updMsg = '';
+    try {
+      if (!('__TAURI_INTERNALS__' in window)) {
+        updMsg = '浏览器预览不支持更新，请使用桌面版。';
+        return;
+      }
+      const found = await check();
+      setPendingUpdate(found);
+      updMsg = found ? `发现新版本 ${found.version}` : '已经是最新版本';
+    } catch (e) {
+      updErr = `检查失败：${e}`;
+    } finally {
+      updBusy = false;
+    }
+  }
+
+  async function installUpdate() {
+    const update = pending;
+    if (!update) return;
+    updBusy = true;
+    updErr = '';
+    progress = 0;
+    let total = 0;
+    let got = 0;
+    try {
+      await update.downloadAndInstall((event) => {
+        if (event.event === 'Started') {
+          total = event.data.contentLength ?? 0;
+        } else if (event.event === 'Progress') {
+          got += event.data.chunkLength;
+          progress = total > 0 ? Math.round((got / total) * 100) : 0;
+        } else if (event.event === 'Finished') {
+          progress = 100;
+        }
+      });
+      updMsg = '安装完成，正在重启…';
+      await relaunch();
+    } catch (e) {
+      updErr = `更新失败：${e}`;
+      updBusy = false;
+    }
+  }
 
   const themeOptions: { value: ThemeMode; label: string }[] = [
     { value: 'auto', label: '跟随系统' },
@@ -193,9 +248,37 @@
     <div class="st-section-title">关于</div>
     <div class="st-card">
       <div class="st-row">
-        <div class="st-label">版本</div>
+        <div class="st-label">当前版本</div>
         <span class="st-value">v{device.version || '—'}</span>
+        {#if pending}<span class="st-value new">可更新到 v{pending.version}</span>{/if}
       </div>
+      <div class="st-row">
+        <div class="st-label">
+          软件更新
+          {#if pending}
+            <span class="st-desc">发现新版本 v{pending.version}，安装后会自动重启</span>
+          {:else if updMsg}
+            <span class="st-desc">{updMsg}</span>
+          {/if}
+        </div>
+        <div class="st-control">
+          {#if pending}
+            <button class="st-btn primary" onclick={installUpdate} disabled={updBusy}>下载并安装</button>
+          {/if}
+          <button class="st-btn" onclick={checkUpdate} disabled={updBusy}>
+            {updBusy && !pending ? '检查中…' : '检查更新'}
+          </button>
+        </div>
+      </div>
+      {#if updBusy && pending}
+        <div class="update-row">
+          <div class="update-bar"><i style="width: {progress}%"></i></div>
+          <span class="st-value">{progress}%</span>
+        </div>
+      {/if}
+      {#if updErr}
+        <div class="update-error">{updErr}</div>
+      {/if}
       <div class="st-row">
         <div class="st-label">支持的设备</div>
         <span class="st-value">G3 V2 · A7 V3 Ultra+ · K99 V2（2.4G）</span>

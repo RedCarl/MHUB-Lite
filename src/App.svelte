@@ -15,6 +15,7 @@
     isOnline,
   } from './lib/device.svelte';
   import { prefs } from './lib/prefs.svelte';
+  import { checkUpdatesSilently, updateState } from './lib/update.svelte';
   import { connectionLabel } from './lib/format';
   import Logo from './components/Logo.svelte';
   import TitleBar from './components/TitleBar.svelte';
@@ -95,6 +96,9 @@
 
   onMount(() => {
     void init();
+    void checkUpdatesSilently();
+    const updateTimer = setInterval(() => void checkUpdatesSilently(), 6 * 60 * 60 * 1000);
+    return () => clearInterval(updateTimer);
   });
 
   type NavItem = { name: RouteName; label: string; icon: typeof icons.overview };
@@ -211,6 +215,9 @@
       >
         <span class="ico"><HugeiconsIcon icon={icons.settings} size={ICON_SIZE.control} /></span>
         <span>设置</span>
+        {#if updateState.version}
+          <i class="settings-dot" title={`有新版本 ${updateState.version}`} aria-label={`有新版本 ${updateState.version}`}></i>
+        {/if}
       </button>
 
       <button class="foot" onclick={() => go('overview')} title="查看设备概览">

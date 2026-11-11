@@ -4,7 +4,7 @@
 
 直接通过 USB HID / 2.4G 接收器读写设备的板载配置。没有账号、没有云端、没有 Electron —— 一个窗口，几 MB 的原生应用。改动即时写入，不需要再点「应用」。
 
-**[下载最新版本](https://github.com/RedCarl/MHUB-Lite/releases/latest)** · macOS 11+ / Windows 10+
+**[官网 / 下载页](https://redcarl.github.io/MHUB-Lite/)** · [GitHub Releases](https://github.com/RedCarl/MHUB-Lite/releases/latest) · macOS 11+ / Windows 10+
 
 ![MHUB Lite 鼠标概览](screenshots/mouse-overview.png)
 
@@ -152,6 +152,8 @@ sudo udevadm trigger
 
 安装包没有开发者证书：macOS 首次打开若提示「已损坏」，在 Finder 里右键 → 打开；Windows SmartScreen 提示「未知发布者」时选择「仍要运行」。
 
+应用内更新走 GitHub Releases，设置页可手动检查；有新版本时侧栏设置按钮会出现一个小圆点。
+
 ### 从源码构建
 
 需要 **Node.js 20+、pnpm、Rust stable**。
@@ -194,7 +196,7 @@ pnpm build
 - **协议层**：Rust，hidapi 直接收发 HID 报文；鼠标与键盘用独立模块，互不影响
 - **图标**：Hugeicons（Stroke Rounded 免费集）
 - **材质**：Solid Glass（移植到普通 CSS，无 Tailwind / shadcn）
-- **体积**：release 开启 `opt-level=z`、LTO、strip；macOS arm64 `.app` 约 2.7 MB
+- **体积**：release 开启 `opt-level=z`、LTO、strip；macOS arm64 `.app` 约 3.7 MB
 
 ```
 MHUB-Lite/

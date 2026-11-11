@@ -54,6 +54,8 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           # 给 .app 做完整的 ad-hoc 签名；不做的话只有 linker-signed 戳，
           # 签名不覆盖 Resources，macOS 可能提示「应用已损坏」。
           APPLE_SIGNING_IDENTITY: '-'
@@ -63,8 +65,9 @@ jobs:
           releaseBody: |
             跨平台 MCHOSE 鼠标 / 键盘管理工具（Tauri 2 + Svelte 5）。
 
-            - Windows：`MHUB Lite_<版本>_x64-setup.exe`，或 `.msi`
-            - macOS：`MHUB Lite_<版本>_aarch64.dmg`（Apple 芯片）/ `_x64.dmg`（Intel）
+            - Windows：`MHUB.Lite_<版本>_x64-setup.exe`，或 `.msi`
+            - macOS：`MHUB.Lite_<版本>_aarch64.dmg`（Apple 芯片）/ `_x64.dmg`（Intel）
+            - `.sig` 与 `latest.json` 是应用内自动更新用的，不需要手动下载
             - macOS 11+ / Windows 10+
             - 安装包没有开发者证书；macOS 首次打开若提示「已损坏」，在 Finder 里右键 → 打开
             - Windows SmartScreen 提示「未知发布者」时选择「仍要运行」
