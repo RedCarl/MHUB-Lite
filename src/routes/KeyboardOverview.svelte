@@ -5,11 +5,13 @@
   import { connectionLabel, formatHz, formatMinutes, timeAgo } from '../lib/format';
   import { go } from '../lib/router.svelte';
   import KeyboardBoard from '../components/KeyboardBoard.svelte';
+  import { keyboardArt } from '../lib/deviceArt';
   import BatteryGauge from '../components/BatteryGauge.svelte';
 
   const kb = $derived(device.keyboard);
   const perf = $derived(kb?.performance);
   const mode = $derived(kb?.lightModes.find((m) => m.id === perf?.lightMode));
+  const art = $derived(keyboardArt(kb?.info.model, kb?.info.productName));
 
   const stats = $derived.by(() => {
     if (!perf) return [];
@@ -82,8 +84,12 @@
     </div>
   {:else}
     <section class="device-hero keyboard-hero card">
-      <div class="keyboard-figure">
-        <KeyboardBoard layers={kb.layers} compact />
+      <div class="keyboard-figure official-figure">
+        {#if art}
+          <img class="device-render keyboard-render" src={art} alt={kb.info.productName} draggable="false" />
+        {:else}
+          <KeyboardBoard layers={kb.layers} compact />
+        {/if}
         <span class="board-caption">K99 V2 · 99 键</span>
       </div>
 

@@ -13,12 +13,14 @@
   } from '../lib/format';
   import { go } from '../lib/router.svelte';
   import MouseView from '../components/MouseView.svelte';
+  import { mouseArt } from '../lib/deviceArt';
   import BatteryGauge from '../components/BatteryGauge.svelte';
 
   const snap = $derived(device.mouse);
   const cfg = $derived(snap?.config);
   const caps = $derived(snap?.info.capabilities);
   const online = $derived(!!snap?.online);
+  const art = $derived(mouseArt(snap?.info.model, snap?.info.productName));
   const busy = $derived(device.busy);
   const mice = $derived(device.devices.filter((d) => d.kind === 'mouse'));
   const supported = $derived(mice.filter((d) => d.supported));
@@ -186,14 +188,18 @@
     {/if}
 
     <section class="device-hero card">
-      <div class="device-figure">
-        <MouseView
-          buttons={snap.buttons}
-          label={false}
-          onselect={() => {
-            if (caps?.buttons) go('buttons');
-          }}
-        />
+      <div class="device-figure official-figure">
+        {#if art}
+          <img class="device-render mouse-render" src={art} alt={snap.info.productName} draggable="false" />
+        {:else}
+          <MouseView
+            buttons={snap.buttons}
+            label={false}
+            onselect={() => {
+              if (caps?.buttons) go('buttons');
+            }}
+          />
+        {/if}
       </div>
 
       <div class="device-summary">
@@ -221,14 +227,25 @@
         <BatteryGauge battery={snap.battery} online={online} />
 
         <dl class="meta-list">
-          <div>
-            <dt>固件版本</dt>
-            <dd>{snap.info.firmware ?? '—'}</dd>
-          </div>
-          <div>
-            <dt>构建日期</dt>
-            <dd>{snap.info.buildDate ?? '—'}</dd>
-          </div>
+          {#if snap.info.firmware || snap.info.buildDate}
+            <div>
+              <dt>固件版本</dt>
+              <dd>{snap.info.firmware ?? '—'}</dd>
+            </div>
+            <div>
+              <dt>构建日期</dt>
+              <dd>{snap.info.buildDate ?? '—'}</dd>
+            </div>
+          {:else}
+            <div>
+              <dt>设备类型</dt>
+              <dd>{snap.info.model ?? '游戏鼠标'}</dd>
+            </div>
+            <div>
+              <dt>连接</dt>
+              <dd>{connectionLabel(snap.info.connection)}</dd>
+            </div>
+          {/if}
           <div>
             <dt>硬件 ID</dt>
             <dd class="mono">{hexId(snap.info.vendorId)}:{hexId(snap.info.productId)}</dd>

@@ -1,0 +1,27 @@
+MHUB Lite — third-party asset notice
+====================================
+
+Product renders
+---------------
+The following images are product renders published by MCHOSE (迈从科技) through
+its official web driver asset CDN. They are included only so the desktop app can
+show the connected device model. MCHOSE, the MCHOSE wordmark and the product
+designs are trademarks or copyright of 迈从科技有限公司. They are not covered by
+this project's MIT license.
+
+- A7 V3 Ultra+ (white):
+  https://cdn.mchose.com.cn/configCenter/static/images/1.A7_V3_Ultra_白色_2x_0g1mlc0jen87u3o8.png
+- K99 V2 (mount / black):
+  https://cdn.mchose.com.cn/configCenter/static/images/K99V2MountShaded_2c6u3xbbee07vojw.png
+- G3 V2 (white):
+  https://cdn.mchose.com.cn/configCenter/assets/img/mouse/G3V2_white.png
+
+The source images were resized and re-encoded as WebP for the app bundle; the
+artwork itself is unchanged.
+
+Logo
+----
+The MCHOSE glyph in assets/logo.svg and src/components/Logo.svelte was supplied
+by the user of this project. It remains a MCHOSE trademark.
+
+No source code from the official installer or web driver is included.

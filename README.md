@@ -170,7 +170,7 @@ pnpm build
 - **协议层**：Rust，hidapi 直接收发 HID 报文；鼠标与键盘用独立模块，互不影响
 - **图标**：Hugeicons（Stroke Rounded 免费集）
 - **材质**：Solid Glass（移植到普通 CSS，无 Tailwind / shadcn）
-- **体积**：release 开启 `opt-level=z`、LTO、strip；macOS arm64 `.app` 约 2.8 MB
+- **体积**：release 开启 `opt-level=z`、LTO、strip；macOS arm64 `.app` 约 2.7 MB
 
 ```
 MHUB-Lite/
@@ -199,7 +199,7 @@ MHUB-Lite/
 
 ## 设计
 
-界面沿用 TinyMusic 的 Solid Glass 材质和外壳规则：212px 侧边栏、内缩 8px 的圆角内容玻璃、侧栏选中块滑动指示、深/浅两套令牌、减少透明与减少动效的退路。
+概览页使用 MCHOSE 官方产品渲染图（A7 V3 Ultra+ / K99 V2 / G3 V2）；界面沿用 TinyMusic 的 Solid Glass 材质和外壳规则：212px 侧边栏、内缩 8px 的圆角内容玻璃、侧栏选中块滑动指示、深/浅两套令牌、减少透明与减少动效的退路。
 
 设备工具在此基础上做了适配：
 
@@ -244,6 +244,10 @@ MHUB-Lite/
 - [TinyMusic](https://github.com/RedCarl/TinyMusic)：Tauri + Svelte 技术栈、窗口外壳、Solid Glass 材质与交互规则。
 - [solid-glass](https://github.com/deeplethe/solid-glass)：材质语言。
 - [Hugeicons](https://hugeicons.com/)：图标。
+
+产品渲染图（A7 V3 Ultra+ / K99 V2 / G3 V2）来自 MCHOSE 官方网页驱动的 configCenter
+资源，仅用于识别已连接的设备；MCHOSE 名称、商标与图片版权归迈从科技所有。
+详见 [NOTICE](NOTICE)。
 
 ## 许可
 

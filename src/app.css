@@ -3367,3 +3367,35 @@ select:-webkit-autofill {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---- 官方产品渲染图 ---- */
+.device-render {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+  user-select: none;
+  pointer-events: none;
+  filter: drop-shadow(0 22px 26px var(--glass-shade));
+}
+
+.mouse-render {
+  max-height: 290px;
+}
+
+.keyboard-render {
+  width: 100%;
+  max-height: 250px;
+}
+
+.official-figure {
+  min-height: 280px;
+}
+
+.keyboard-figure.official-figure {
+  min-height: 240px;
+  background:
+    radial-gradient(58% 76% at 50% 46%, color-mix(in oklch, var(--bg3) 70%, transparent), transparent 76%),
+    linear-gradient(180deg, oklch(1 0 0 / 2%), transparent);
+}
