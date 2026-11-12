@@ -1,12 +1,18 @@
 # MHUB Lite
 
-**轻量、离线、跨平台的 MCHOSE 鼠标 + 键盘管理工具。**
+一个几 MB 的 MCHOSE 鼠标 / 键盘管理工具。DPI、改键、灯效、回报率，都在一个窗口里。
 
-直接通过 USB HID / 2.4G 接收器读写设备的板载配置。没有账号、没有云端、没有 Electron —— 一个窗口，几 MB 的原生应用。改动即时写入，不需要再点「应用」。
+**[官网与下载](https://redcarl.github.io/MHUB-Lite/)** · **[源码](https://github.com/RedCarl/MHUB-Lite)** · **[问题反馈](https://github.com/RedCarl/MHUB-Lite/issues)**
 
-**[官网 / 下载页](https://redcarl.github.io/MHUB-Lite/)** · [GitHub Releases](https://github.com/RedCarl/MHUB-Lite/releases/latest) · macOS 11+ / Windows 10+
+![MHUB Lite 主界面：鼠标概览、设备切换与 DPI 档位](site/assets/screenshot.jpg)
 
-![MHUB Lite 鼠标概览](screenshots/mouse-overview.png)
+---
+
+## 这是什么
+
+MHUB Lite 是一个 Windows / macOS 上的 MCHOSE 设备工具。插上鼠标或 2.4G 接收器，就能查看电量、调 DPI、改按键、换灯效，改动会直接写进设备的板载存储。
+
+它不登录账号、不上传配置，也没有云端同步。界面只做一件事：把设备当前的真实状态摆出来，让你改完就能走。
 
 ---
 
@@ -14,268 +20,113 @@
 
 ### 鼠标
 
-| | |
-|---|---|
-| **设备概览** | 电量、充电状态、连接方式、硬件 ID、当前 DPI / 回报率 / 防抖 / 休眠 |
-| **DPI** | 启用 1–6 档、切换当前档位、每档 DPI 独立调节 |
-| **性能** | 回报率、按键防抖、无线休眠；G3 V2 另有 LOD |
-
-支持两套鼠标协议：
-
-- **MCHOSE G3 V2**（有线 `0x3837:0x418C` / 2.4G `0x4245`）：`0x55` 64 字节帧，DPI、回报率、按键、防抖、休眠、LOD。协议来自 M-RustHub 的实机验证；本机没有 G3 V2 硬件。
-- **MCHOSE A7 V3 Ultra+**（`0x3837:0x1018`）：`0x4D` 帧，DPI、回报率、防抖、休眠、电量。本机已实测读取和 DPI 写入；A7 的按键改键与灯光暂未开放。
+- 概览：电量、充电状态、连接方式、当前 DPI / 回报率 / 防抖 / 休眠
+- DPI：启用 1–6 档、切换当前档位、每档单独调节
+- 性能：回报率、按键防抖、无线休眠
+- 支持 G3 V2 和 A7 V3 Ultra+；A7 暂未开放改键与灯效
 
 ### 键盘
 
-| | |
+- 三层改键：Default / Fn / Fn2，99 键可视化布局
+- 把任意键映射成其他按键、修饰键、媒体键或自定义代码
+- 灯效：模式、亮度、速度、单色 / 多彩
+- 性能：250 / 500 / 1000 Hz 回报率、按键延迟、无线休眠、Win 键锁定、Mac 模式
+- 目前支持 K99 V2 2.4G
+
+### 即时保存
+
+没有「草稿 → 应用」两步。改完稍等一两秒就写入设备，侧边栏会显示「保存中… / 已保存」；连续拖滑块会合并成一次写入，不会反复擦写。
+
+### 多设备
+
+鼠标和键盘可以同时连接。侧边栏顶部切换当前设备，导航会跟着变；设置固定在侧边栏底部，不占导航。
+
+### 其他
+
+- 跟随系统的浅色 / 深色主题，也可以手动指定
+- 应用内检查更新，发现新版本时设置按钮出现小圆点
+- Windows / macOS 双平台，离线可用
+- 不登录、不联网也能管理设备
+
+---
+
+## 下载与安装
+
+安装包都在这一个页面：**<https://redcarl.github.io/MHUB-Lite/>**
+
+下载默认走镜像加速，页面底部可以切换成 GitHub 直连。
+
+| 平台 | 要求 |
 |---|---|
-| **三层改键** | Default / Fn / Fn2，99 键可视化布局，随意映射按键、修饰键、媒体键或自定义 4 字节代码 |
-| **灯效** | 灯效模式、亮度、速度、单色/多彩 |
-| **性能** | 250 / 500 / 1000 Hz 回报率、速度/标准延迟、无线休眠、Win 键锁定、Mac 模式 |
+| Windows | Windows 10 / 11，64 位 |
+| macOS | macOS 11 及以上，Apple 芯片或 Intel |
 
-目前已验证 **MCHOSE K99 V2 2.4G**（接收器 `0x41E4:0x2001`）：读取型号签名后读写三层键表、灯效块与性能块。修改即刻保存。
-
-![键盘概览](screenshots/keyboard-overview.png)
-
----
-
-## 即时保存
-
-没有草稿、没有底部「写入设备」栏，也没有播放器式的悬浮条：
-
-- 改 DPI、回报率、防抖、休眠或按键后，短暂合并（鼠标约 320 ms、键盘约 450 ms）就写入设备；
-- 连续拖动滑块会合并成一次写入，不会每移动一像素就擦一次 Flash；
-- 写入串行排队，结果会回读确认；
-- 侧边栏底部显示「保存中… / 已保存」，失败时在内容区顶部给出明确原因。
-
-键盘的一次完整写入需要约 1.2 秒（固件要求写入间隔），界面会保持可操作，等待期间继续改的值会在上一笔完成后自动接上。
+- 安装包约 3–4 MB，新版本可在「设置 → 软件更新」里检查
+- macOS 首次打开若提示「已损坏」，在 Finder 里右键选择「打开」即可（安装包没有做 Apple 公证）
+- **macOS 键盘需要「输入监控」权限**：系统设置 → 隐私与安全性 → 输入监控，允许 MHUB Lite 后重启应用
+- Windows 安装包没有代码签名，SmartScreen 若提示「未知发布者」，选择「仍要运行」
+- 历史版本都在 [GitHub Releases](https://github.com/RedCarl/MHUB-Lite/releases)
 
 ---
 
-## 多设备
+## 常见问题
 
-鼠标和键盘可以同时连接。侧边栏顶部的「鼠标 / 键盘」开关切换当前设备，导航会随设备类型变化：
+**支持哪些设备？**
 
-- 鼠标：概览、DPI、性能（G3 V2 额外有「按键」）
-- 键盘：概览、按键、灯效、性能
-- 「设置」不在导航里，而是侧栏底部、设备信息上方的一枚独立按钮
+鼠标：MCHOSE G3 V2、A7 V3 Ultra+。键盘：K99 V2 2.4G。其他型号会被识别出来，但暂时只读，不会写入。
 
----
+**为什么 A7 不能改键、调灯效？**
 
-## 截图
+这两块协议还没有完全验证。MHUB Lite 只对确认过的写入开放，宁可先不做，也不拿设备冒险。
 
-| 鼠标概览 | 键盘概览 |
-|---|---|
-| ![鼠标概览](screenshots/mouse-overview.png) | ![键盘概览](screenshots/keyboard-overview.png) |
+**键盘连不上？**
 
-| 键盘三层改键 | 键盘灯效 |
-|---|---|
-| ![键盘改键](screenshots/keyboard-keys.png) | ![键盘灯效](screenshots/keyboard-lighting.png) |
+先关掉 MCHOSE HUB、浏览器里的 MCHOSE 网页驱动，以及其他占用 HID 的程序。macOS 还需要在「输入监控」里允许 MHUB Lite。
 
-| 键盘性能 | 设置与设备切换 |
-|---|---|
-| ![键盘性能](screenshots/keyboard-performance.png) | ![设置](screenshots/settings.png) |
+**会写坏设备吗？**
 
-![鼠标 DPI](screenshots/mouse-dpi.png)
+只对已验证的型号写入；写入前会校验范围，写完会回读确认。没有验证的型号只显示信息。
 
----
+**需要联网吗？**
 
-## 支持的硬件
+管理设备完全离线。只有检查更新和下载新版本需要网络，没有账号、没有遥测。
 
-| 型号 | 连接 | 支持 | 说明 |
-|---|---|---|---|
-| MCHOSE G3 V2 | `0x3837:0x418C` 有线 | 鼠标全功能 | G3 V2 协议 |
-| MCHOSE G3 V2 | `0x3837:0x4245` 2.4G | 鼠标全功能 | G3 V2 协议 |
-| MCHOSE A7 V3 Ultra+ | `0x3837:0x1018` 有线 | DPI / 性能 / 电量 | `0x4D` 协议；改键与灯光未开放 |
-| MCHOSE K99 V2 | `0x41E4:0x2001` 2.4G | 改键 / 灯效 / 性能 | 需匹配 K99 V2 签名 |
-| 其他 MCHOSE 型号 | `0x3837:*` / `0x41E4:*` | 只识别 | 未验证协议，不会被写入 |
+**我的配置存在哪？**
 
-- A7 V3 Ultra+ 的 LOD 是 0.7–1.7 mm 五档，当前界面只开放 G3 V2 的 1/2 mm 模型，所以 A7 页面暂不显示 LOD。
-- K99 V2 的宏、逐键 RGB 调色、音乐律动暂未实现。
-- 未验证型号会被列出但拒绝打开写入，避免把未知设备写坏。
-- **本机实测范围**：A7 V3 Ultra+ 的读取与 DPI 写入、K99 V2 2.4G 的键层写入。K99 的灯效/性能块与 A7 的设置块走同一条已验证的传输通道，但尚未逐项做硬件回归。
+配置写在设备自己的板载存储里，换电脑也还在。应用不上传任何设备数据。
+
+**为什么 macOS 提示没有权限？**
+
+键盘的 HID 访问需要「输入监控」权限。允许 MHUB Lite 后重启应用即可；鼠标不受影响。
 
 ---
 
-## 连接提示
+## 免责声明
 
-### 键盘被占用
-
-MCHOSE 网页驱动、MCHOSE HUB 或浏览器里的 WebHID 会独占接收器。MHUB Lite 连接失败时会提示：
-
-> 设备被其他程序独占：请关闭 MCHOSE HUB、浏览器里的 MCHOSE 网页驱动或其他占用 HID 的程序后重试。
-
-关闭这些程序后重新扫描即可。
-
-### macOS
-
-- macOS 11+；安装包没有公证，首次打开若提示「已损坏」，在 Finder 右键 → 打开。
-- 键盘需要「输入监控 / Input Monitoring」权限。如果连接时提示 `not permitted`，打开
-  **系统设置 → 隐私与安全性 → 输入监控**，允许 MHUB Lite，然后重启应用。
-
-### Windows
-
-- Windows 10 / 11，需要 WebView2（系统一般已自带）。
-- 安装包没有代码签名，SmartScreen 提示「未知发布者」时选择「仍要运行」。
-
-### Linux
-
-构建依赖：
-
-```bash
-sudo apt install libudev-dev pkg-config    # Debian / Ubuntu
-sudo dnf install libudev-devel pkgconf     # Fedora
-```
-
-给两组 VID 开放 hidraw 权限：
-
-```bash
-sudo tee /etc/udev/rules.d/70-mchose.rules >/dev/null <<'EOF'
-SUBSYSTEM=="hidraw", ATTRS{idVendor}=="3837", MODE="0660", TAG+="uaccess"
-SUBSYSTEM=="hidraw", ATTRS{idVendor}=="41e4", MODE="0660", TAG+="uaccess"
-EOF
-sudo udevadm control --reload-rules
-sudo udevadm trigger
-```
-
-重新插拔设备后生效。
+- 本项目是**非官方**工具，与 MCHOSE（迈从科技）没有隶属关系，也不代表它们。
+- 只读写经过验证的设备协议；不包含、不分发官方客户端程序。
+- MCHOSE 名称、商标与产品图片版权归迈从科技所有。产品图片仅用于识别设备。
+- 设备写入属于底层操作，请确认型号后使用；使用风险自负。
 
 ---
 
-## 安装与运行
+## 更多
 
-### 直接下载
+- 源码与问题反馈：<https://github.com/RedCarl/MHUB-Lite>
+- 如果它好用，欢迎点个 Star。
+- 给开发者看的技术细节在 [`docs/`](docs/)：协议笔记、界面与交互说明。
 
-到 [GitHub Releases](https://github.com/RedCarl/MHUB-Lite/releases/latest) 下载：
-
-- Windows：`MHUB Lite_<版本>_x64-setup.exe`，或 `.msi`
-- macOS：`MHUB Lite_<版本>_aarch64.dmg`（Apple 芯片）/ `_x64.dmg`（Intel）
-
-安装包没有开发者证书：macOS 首次打开若提示「已损坏」，在 Finder 里右键 → 打开；Windows SmartScreen 提示「未知发布者」时选择「仍要运行」。
-
-应用内更新走 GitHub Releases，设置页可手动检查；有新版本时侧栏设置按钮会出现一个小圆点。
-
-### 从源码构建
-
-需要 **Node.js 20+、pnpm、Rust stable**。
+<details>
+<summary>开发与构建</summary>
 
 ```bash
 pnpm install
-pnpm tauri dev      # 开发（窗口 + 热更新）
-pnpm tauri build    # 打包当前平台的安装包
+pnpm tauri dev          # 开发
+pnpm tauri build        # 打包
+
+cargo test -p mhub-core # 协议层测试，不需要窗口或外设
 ```
 
-### 发布
+需要 Node.js、pnpm 和 Rust 工具链。
 
-推送 `v*` tag 会触发 GitHub Actions 的 `release` 工作流：在 macOS arm64、macOS x64 和 Windows x64 上分别构建，并把安装包上传到对应的 GitHub Release。
-
-```bash
-git tag v0.1.2
-git push origin v0.1.2
-```
-
-
-协议测试不需要窗口或外设：
-
-```bash
-cargo test -p mhub-core
-```
-
-前端类型检查与构建：
-
-```bash
-pnpm check
-pnpm build
-```
-
----
-
-## 技术栈
-
-- **外壳**：Tauri 2（macOS Overlay 标题栏 / Windows 自绘标题栏 / Linux 原生窗口）
-- **界面**：Svelte 5（runes）+ TypeScript + Vite 6
-- **协议层**：Rust，hidapi 直接收发 HID 报文；鼠标与键盘用独立模块，互不影响
-- **图标**：Hugeicons（Stroke Rounded 免费集）
-- **材质**：Solid Glass（移植到普通 CSS，无 Tailwind / shadcn）
-- **体积**：release 开启 `opt-level=z`、LTO、strip；macOS arm64 `.app` 约 3.7 MB
-
-```
-MHUB-Lite/
-├── core/
-│   └── src/
-│       ├── protocol.rs   # G3 V2 0x55 帧
-│       ├── device.rs     # G3 V2 设备与重试
-│       ├── a7.rs         # A7 V3 Ultra+ 0x4D 帧
-│       ├── keyboard.rs   # K99 V2 2.4G 0x13 包与三层键表
-│       ├── mouse.rs      # 鼠标后端枚举
-│       ├── transport.rs  # hidapi 传输
-│       └── catalog.rs    # 已验证型号
-├── src-tauri/            # Tauri 命令、双设备会话、单实例
-├── src/
-│   ├── app.css           # Solid Glass 设计系统
-│   ├── lib/              # api / device / keyboard 布局 / router / theme
-│   ├── components/       # 窗口、Logo、键盘矩阵、鼠标预览、控件
-│   └── routes/           # 鼠标与键盘页面
-├── docs/
-│   ├── protocol.md       # G3 / A7 / K99 协议
-│   └── design.md         # 材质、布局与即时保存交互
-└── screenshots/
-```
-
----
-
-## 设计
-
-概览页使用 MCHOSE 官方产品渲染图（A7 V3 Ultra+ / K99 V2 / G3 V2）；界面沿用 TinyMusic 的 Solid Glass 材质和外壳规则：212px 侧边栏、内缩 8px 的圆角内容玻璃、侧栏选中块滑动指示、深/浅两套令牌、减少透明与减少动效的退路。
-
-设备工具在此基础上做了适配：
-
-1. **设备切换**：侧边栏顶部用一小块分段玻璃在鼠标 / 键盘之间切换，导航随设备类型变化。
-2. **即时保存**：没有播放器式底栏；保存状态放在侧栏设备脚注里，内容区只在失败时出现提示条。
-3. **键盘矩阵**：99 键的可视化布局，Default/Fn/Fn2 三层切换，点键后在下方检查器里改映射。
-4. **鼠标预览**：按键页和概览共用同一只 SVG 鼠标，悬停行时对应区域亮起。
-
-细节见 [`docs/design.md`](docs/design.md)。
-
----
-
-## 安全与边界
-
-- **只写已验证协议**：未知型号只识别，不打开写入。
-- **写入前校验**：DPI 范围/步进、档位数、回报率、防抖、休眠在 Rust 侧再次校验。
-- **先读再改**：键盘的灯效块和三层层键表都是整块覆盖，必须先读回、只改目标字段、再写。
-- **读回确认**：每次写入后回读目标块；不一致时报错，不静默重试整套配置。
-- **保留未知字段**：G3 / A7 / K99 的保留槽都会原样读回、原样写回。
-- **完全离线**：没有网络请求、没有账号、没有遥测。
-- **单实例**：第二个实例只会聚焦已有窗口，避免两个窗口同时写同一台设备。
-
-> 本项目是非官方工具，与 MCHOSE 没有隶属关系。HID 写入属于底层操作，请确认设备型号；使用风险自负。
-
----
-
-## 开发约定
-
-- 提交信息用英文 Conventional Commits，例如 `feat(keyboard): add layer editor`。
-- 用户可见文案用中文；协议注释与诊断信息可以中英混排，但错误码保持英文。
-- 新增型号：在 `catalog.rs` / `a7.rs` / `keyboard.rs` 中加 profile 与能力表，补协议测试；**没有实机验证前不要打开写入**。
-- 提交前跑：`cargo test -p mhub-core && cargo clippy -p mhub-core --all-targets -- -D warnings && pnpm check && pnpm build`。
-
----
-
-## 致谢
-
-- [M-RustHub](https://github.com/hadoooooouken/M-RustHub)：G3 V2 的 HID 协议、帧布局与按键槽位。
-- [mchose-hub-rust](https://github.com/mansur54321/mchose-hub-rust)：A7 V3 Ultra+ / MagDock 的 0x4D 协议与 macOS 传输方式。
-- [MchoseHub](https://github.com/wzk112/MchoseHub)：K99 V2 的无线分包、三层键表、灯效与性能块布局，以及键盘物理布局。
-- [mchose-linux](https://github.com/aipno/mchose-linux)：K99 V2 有线协议与键名表。
-- [TinyMusic](https://github.com/RedCarl/TinyMusic)：Tauri + Svelte 技术栈、窗口外壳、Solid Glass 材质与交互规则。
-- [solid-glass](https://github.com/deeplethe/solid-glass)：材质语言。
-- [Hugeicons](https://hugeicons.com/)：图标。
-
-产品渲染图（A7 V3 Ultra+ / K99 V2 / G3 V2）来自 MCHOSE 官方网页驱动的 configCenter
-资源，仅用于识别已连接的设备；MCHOSE 名称、商标与图片版权归迈从科技所有。
-详见 [NOTICE](NOTICE)。
-
-## 许可
-
-[MIT](LICENSE)
+</details>
