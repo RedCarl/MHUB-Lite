@@ -2180,7 +2180,7 @@ dependencies = [
 
 [[package]]
 name = "mhub-core"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "hidapi",
  "serde",
@@ -2189,7 +2189,7 @@ dependencies = [
 
 [[package]]
 name = "mhub-lite"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "mhub-core",
  "serde",
