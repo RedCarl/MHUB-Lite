@@ -311,6 +311,23 @@ impl Link {
     }
 }
 
+/// 解析 K99 V2 的 `0x4A` 电量回应：`[percent, flags]`。
+///
+/// 官方 Web 驱动的解析器把这个字节拆成两个 4 位字段：
+/// 低 4 位是 `fullStatus`（只在有线模式下把电量显示成 100%），
+/// 高 4 位是 `chargeStatus`，`1` 才表示正在充电。
+///
+/// 旧版本把低 4 位当成充电标志，于是键盘返回 `0x01`（未充电）时
+/// 界面会错误地显示「充电中」。
+fn parse_battery_bytes(data: &[u8]) -> Battery {
+    let percent = data.first().copied().unwrap_or(0).clamp(1, 100);
+    let flags = data.get(1).copied().unwrap_or(0);
+    Battery {
+        percent,
+        charging: (flags >> 4) & 0x0F == 1,
+    }
+}
+
 pub fn checksum(packet: &[u8; PACKET_LEN]) -> u8 {
     let mut sum = REPORT_ID as u32;
     for b in &packet[..PACKET_LEN - 1] {
@@ -458,10 +475,7 @@ impl KeyboardDevice {
         }
 
         let battery_data = link.read_data(0x4A, 0, 2)?;
-        let battery = Battery {
-            percent: battery_data[0].clamp(1, 100),
-            charging: battery_data[1] & 0x0F != 0,
-        };
+        let battery = parse_battery_bytes(&battery_data);
         let mut perf = link.read_data(0x44, 0, PERF_LEN)?;
         perf.truncate(PERF_LEN);
         let light = link.read_data(0x49, 0, LIGHT_LEN)?;
@@ -504,10 +518,7 @@ impl KeyboardDevice {
 
     pub fn read_live(&mut self) -> Result<LiveStatus, DeviceError> {
         let data = self.link.read_data(0x4A, 0, 2)?;
-        self.battery = Battery {
-            percent: data[0].clamp(1, 100),
-            charging: data[1] & 0x0F != 0,
-        };
+        self.battery = parse_battery_bytes(&data);
         Ok(LiveStatus {
             online: true,
             battery: Some(self.battery),
@@ -517,10 +528,7 @@ impl KeyboardDevice {
     pub fn refresh(&mut self) -> Result<KeyboardSnapshot, DeviceError> {
         self.battery = {
             let data = self.link.read_data(0x4A, 0, 2)?;
-            Battery {
-                percent: data[0].clamp(1, 100),
-                charging: data[1] & 0x0F != 0,
-            }
+            parse_battery_bytes(&data)
         };
         self.perf = self.link.read_data(0x44, 0, PERF_LEN)?;
         self.perf.truncate(PERF_LEN);
@@ -681,6 +689,34 @@ fn unix_now() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn battery_charging_is_the_high_nibble() {
+        // 0x01 = 低 4 位的 fullStatus，不表示充电；这是用户实际遇到的情况。
+        let idle = parse_battery_bytes(&[92, 0x01]);
+        assert_eq!(idle.percent, 92);
+        assert!(!idle.charging);
+
+        // 0x10 = 高 4 位 chargeStatus 为 1：正在充电。
+        let charging = parse_battery_bytes(&[92, 0x10]);
+        assert_eq!(charging.percent, 92);
+        assert!(charging.charging);
+
+        // 充满时低 4 位为 1，但充电标志已经落下。
+        let full = parse_battery_bytes(&[100, 0x01]);
+        assert_eq!(full.percent, 100);
+        assert!(!full.charging);
+    }
+
+    #[test]
+    fn battery_bytes_are_clamped() {
+        let low = parse_battery_bytes(&[0, 0x00]);
+        assert_eq!(low.percent, 1);
+        assert!(!low.charging);
+        let over = parse_battery_bytes(&[200, 0x10]);
+        assert_eq!(over.percent, 100);
+        assert!(over.charging);
+    }
 
     #[test]
     fn k99_signature_matches() {

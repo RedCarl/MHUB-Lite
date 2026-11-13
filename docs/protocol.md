@@ -342,7 +342,7 @@ checksum = (0x13 + sum(packet[0..17])) & 0xFF
 
 ### 数据块
 
-- 电量：2 字节，`[percent, status]`，低 4 位非 0 = 充电。
+- 电量：2 字节，`[percent, flags]`。`flags` 拆成两个 4 位字段：低 4 位是 `fullStatus`（只有有线模式会据此把电量显示成 100%），高 4 位是 `chargeStatus`，`1` 才表示正在充电。官方 Web 驱动的 `bit4("fullStatus").bit4("chargeStatus")` 就是这个顺序。
 - 性能：128 字节，偏移见下表。
 - 单色表：490 字节。
 - 键层：3 × 452 字节（113 键 × 4 字节）。
