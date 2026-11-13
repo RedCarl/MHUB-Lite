@@ -89,6 +89,52 @@ export type DeviceSummary = {
 
 export type LiveStatus = { online: boolean; battery: Battery | null };
 
+/** 后台常驻与电量提醒的设置；存在应用配置目录，不在 localStorage。 */
+export type MonitorSettings = {
+  closeToTray: boolean;
+  enabled: boolean;
+  notifyLow: boolean;
+  lowThreshold: number;
+  intervalSecs: number;
+  startAtLogin: boolean;
+};
+
+export type MonitorReading = {
+  kind: DeviceKind;
+  key: string;
+  name: string;
+  online: boolean;
+  battery: Battery | null;
+};
+
+export type MonitorStatus = {
+  mouse: MonitorReading | null;
+  keyboard: MonitorReading | null;
+  readAt: number;
+};
+
+export type MonitorConfig = { settings: MonitorSettings; autostart: boolean };
+
+export type BatteryAlert = {
+  kind: DeviceKind;
+  key: string;
+  name: string;
+  percent: number;
+  threshold: number;
+  /** 系统通知是否真的显示出来了 */
+  notified: boolean;
+  message: string | null;
+};
+
+export const DEFAULT_MONITOR_SETTINGS: MonitorSettings = {
+  closeToTray: true,
+  enabled: true,
+  notifyLow: true,
+  lowThreshold: 20,
+  intervalSecs: 60,
+  startAtLogin: false,
+};
+
 export type Snapshot = {
   info: DeviceInfo;
   online: boolean;
@@ -411,6 +457,48 @@ async function mockCall<T>(cmd: string, args?: Record<string, unknown>): Promise
       mockButtons = [...buttons];
       return mockSnapshot() as T;
     }
+    case 'monitor_config':
+      return {
+        settings: { ...DEFAULT_MONITOR_SETTINGS },
+        autostart: false,
+      } as T;
+    case 'monitor_status': {
+      const mouse = mockConnected
+        ? {
+            kind: 'mouse' as DeviceKind,
+            key: 'demo',
+            name: 'MCHOSE G3 V2',
+            online: mockOnline,
+            battery: mockOnline ? { ...mockBattery } : null,
+          }
+        : null;
+      const keyboard = mockKbConnected
+        ? {
+            kind: 'keyboard' as DeviceKind,
+            key: 'kb-demo',
+            name: 'MCHOSE K99 V2',
+            online: true,
+            battery: { percent: 95, charging: true },
+          }
+        : null;
+      return { mouse, keyboard, readAt: Math.floor(Date.now() / 1000) } as T;
+    }
+    case 'set_monitor_settings': {
+      const settings = args?.settings as MonitorSettings;
+      return {
+        settings: {
+          ...DEFAULT_MONITOR_SETTINGS,
+          ...settings,
+          lowThreshold: Math.min(50, Math.max(5, Number(settings.lowThreshold) || 20)),
+          intervalSecs: Math.min(1800, Math.max(15, Number(settings.intervalSecs) || 60)),
+        },
+        autostart: !!settings.startAtLogin,
+      } as T;
+    }
+    case 'test_battery_notification':
+      return undefined as T;
+    case 'quit_app':
+      return undefined as T;
     case 'app_version':
       return '0.1.0' as T;
     default:
@@ -460,5 +548,20 @@ export const api = {
   },
   appVersion() {
     return call<string>('app_version');
+  },
+  monitorConfig() {
+    return call<MonitorConfig>('monitor_config');
+  },
+  monitorStatus() {
+    return call<MonitorStatus>('monitor_status');
+  },
+  setMonitorSettings(settings: MonitorSettings) {
+    return call<MonitorConfig>('set_monitor_settings', { settings });
+  },
+  testBatteryNotification() {
+    return call<void>('test_battery_notification');
+  },
+  quitApp() {
+    return call<void>('quit_app');
   },
 };

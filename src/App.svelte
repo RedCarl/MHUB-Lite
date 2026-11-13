@@ -15,6 +15,7 @@
     isOnline,
   } from './lib/device.svelte';
   import { prefs } from './lib/prefs.svelte';
+  import { initMonitor } from './lib/monitor.svelte';
   import { checkUpdatesSilently, updateState } from './lib/update.svelte';
   import { connectionLabel } from './lib/format';
   import Logo from './components/Logo.svelte';
@@ -96,6 +97,7 @@
 
   onMount(() => {
     void init();
+    void initMonitor();
     void checkUpdatesSilently();
     const updateTimer = setInterval(() => void checkUpdatesSilently(), 6 * 60 * 60 * 1000);
     return () => clearInterval(updateTimer);

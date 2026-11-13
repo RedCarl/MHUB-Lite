@@ -25,8 +25,8 @@ pub use keyboard::{
     KeyboardDevice, KeyboardInput, KeyboardPerformance, KeyboardSnapshot, LightModeInfo,
 };
 pub use model::{
-    Battery, ButtonAction, Capabilities, ConnectionKind, DeviceInfo, DeviceSummary, DpiRange,
-    LiveStatus, Lod, MouseConfig, Snapshot, DEFAULT_BUTTONS, DPI_STEP, MAX_DPI, MIN_DPI,
+    Battery, ButtonAction, Capabilities, ConnectionKind, DeviceInfo, DeviceKind, DeviceSummary,
+    DpiRange, LiveStatus, Lod, MouseConfig, Snapshot, DEFAULT_BUTTONS, DPI_STEP, MAX_DPI, MIN_DPI,
 };
 pub use mouse::scan as scan_mice;
 pub use mouse::MouseDevice;

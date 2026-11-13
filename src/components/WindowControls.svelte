@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { getCurrentWindow } from '@tauri-apps/api/window';
+  import { monitor } from '../lib/monitor.svelte';
 
   /**
    * 窗口按钮（Windows 自绘标题栏的一部分）。
@@ -83,7 +84,12 @@
       </svg>
     </button>
 
-    <button class="wc close" onclick={close} title="关闭" aria-label="关闭">
+    <button
+      class="wc close"
+      onclick={close}
+      title={monitor.settings.closeToTray ? '关闭窗口（后台继续监测电量）' : '关闭应用'}
+      aria-label={monitor.settings.closeToTray ? '关闭窗口，应用继续在后台运行' : '关闭应用'}
+    >
       <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">
         <path d="M1.5 1.5 10.5 10.5M10.5 1.5 1.5 10.5" />
       </svg>

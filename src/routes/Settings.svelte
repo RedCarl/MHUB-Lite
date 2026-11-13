@@ -11,6 +11,13 @@
     saveLabel,
   } from '../lib/device.svelte';
   import { prefs, persistPrefs } from '../lib/prefs.svelte';
+  import {
+    monitor,
+    monitorStatusText,
+    quitApplication,
+    testMonitorNotification,
+    updateMonitorSettings,
+  } from '../lib/monitor.svelte';
   import { theme, setTheme, type ThemeMode } from '../lib/theme.svelte';
   import { connectionLabel, hexId, timeAgo } from '../lib/format';
   import { copyText } from '../lib/toast.svelte';
@@ -88,6 +95,16 @@
     { value: 10, label: '10 秒' },
     { value: 0, label: '关闭' },
   ];
+  const thresholdOptions = [
+    { value: 10, label: '10%' },
+    { value: 20, label: '20%' },
+    { value: 30, label: '30%' },
+  ];
+  const monitorIntervalOptions = [
+    { value: 30, label: '30 秒' },
+    { value: 60, label: '1 分钟' },
+    { value: 300, label: '5 分钟' },
+  ];
 
   function setPoll(v: number) {
     prefs.pollSeconds = v;
@@ -104,7 +121,7 @@
   <div class="page-head">
     <div class="page-title">
       <h1>设置</h1>
-      <p class="page-sub">外观、设备连接和诊断信息。</p>
+      <p class="page-sub">外观、设备、后台提醒和诊断信息。</p>
     </div>
     <div class="page-actions">
       {#if saveLabel()}<span class="save-chip" class:busy={device.saveState === 'saving'}>{saveLabel()}</span>{/if}
@@ -155,6 +172,94 @@
           />
           重新扫描设备
         </button>
+      </div>
+    </div>
+  </section>
+
+  <section class="st-section">
+    <div class="st-section-title">后台与电量</div>
+    <div class="st-card">
+      <div class="st-row">
+        <div class="st-label">
+          后台常驻
+          <span class="st-desc">关闭窗口时隐藏到托盘 / 菜单栏，电量监测继续运行；需要真正退出时用托盘菜单或下面的退出按钮</span>
+        </div>
+        <Toggle
+          checked={monitor.settings.closeToTray}
+          onchange={(v) => void updateMonitorSettings({ closeToTray: v })}
+          label="后台常驻"
+        />
+      </div>
+      <div class="st-row">
+        <div class="st-label">
+          开机自动启动
+          <span class="st-desc">登录系统后自动在后台启动；启动后窗口默认隐藏</span>
+        </div>
+        <Toggle
+          checked={monitor.autostart}
+          onchange={(v) => void updateMonitorSettings({ startAtLogin: v })}
+          label="开机自动启动"
+        />
+      </div>
+      <div class="st-row">
+        <div class="st-label">
+          电量监测
+          <span class="st-desc">后台定期读取鼠标和键盘的电量，窗口隐藏后仍然生效</span>
+        </div>
+        <Toggle
+          checked={monitor.settings.enabled}
+          onchange={(v) => void updateMonitorSettings({ enabled: v })}
+          label="电量监测"
+        />
+      </div>
+      <div class="st-row">
+        <div class="st-label">
+          低电量提醒
+          <span class="st-desc">电量低于阈值时发送系统通知；同一轮放电只提醒一次，充电后重新计数</span>
+        </div>
+        <Toggle
+          checked={monitor.settings.notifyLow}
+          onchange={(v) => void updateMonitorSettings({ notifyLow: v })}
+          label="低电量提醒"
+        />
+      </div>
+      <div class="st-row">
+        <div class="st-label">
+          提醒阈值
+          <span class="st-desc">电量低于等于这个值时提醒；充电时不会打扰</span>
+        </div>
+        <Segmented
+          value={monitor.settings.lowThreshold}
+          options={thresholdOptions}
+          onchange={(v) => void updateMonitorSettings({ lowThreshold: v })}
+          label="提醒阈值"
+        />
+      </div>
+      <div class="st-row">
+        <div class="st-label">
+          检查间隔
+          <span class="st-desc">后台读取电量的频率；读取只在设备在线时产生一次短暂 HID 访问</span>
+        </div>
+        <Segmented
+          value={monitor.settings.intervalSecs}
+          options={monitorIntervalOptions}
+          onchange={(v) => void updateMonitorSettings({ intervalSecs: v })}
+          label="检查间隔"
+        />
+      </div>
+      <div class="st-row">
+        <div class="st-label">
+          当前状态
+          <span class="st-desc">
+            {monitor.status.readAt ? `上次读取于 ${timeAgo(monitor.status.readAt)}` : '还没有读取过电量'}
+          </span>
+        </div>
+        <div class="st-control">
+          <span class="st-value">{monitorStatusText()}</span>
+          <button class="st-btn" onclick={() => void testMonitorNotification()}>
+            发送测试提醒
+          </button>
+        </div>
       </div>
     </div>
   </section>
@@ -282,6 +387,13 @@
       <div class="st-row">
         <div class="st-label">支持的设备</div>
         <span class="st-value">G3 V2 · A7 V3 Ultra+ · K99 V2（2.4G）</span>
+      </div>
+      <div class="st-row">
+        <div class="st-label">
+          退出应用
+          <span class="st-desc">退出后不再读取电量，也不会再发提醒</span>
+        </div>
+        <button class="st-btn danger" onclick={() => void quitApplication()}>退出 MHUB Lite</button>
       </div>
       <div class="st-row st-row-note">
         <p class="st-desc">
