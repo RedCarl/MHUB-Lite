@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>MHUB Lite — 几 MB 的 MCHOSE 设备管理工具</title>
-<meta name="description" content="MHUB Lite 是一个轻量的 MCHOSE 鼠标 / 键盘管理工具：DPI、回报率、三层改键、灯效，直接写进板载存储。基于 Tauri 2 + Svelte 5 + Rust，开源 MIT。" />
+<meta name="description" content="MHUB Lite 是一个几 MB 的 MCHOSE 鼠标 / 键盘管理工具：DPI、回报率、三层改键、灯效，直接写进板载存储。基于 Tauri 2 + Svelte 5 + Rust，开源 MIT。" />
 <meta name="theme-color" content="#0e0f10" media="(prefers-color-scheme: dark)" />
 <meta name="theme-color" content="#f6f6f7" media="(prefers-color-scheme: light)" />
 <link rel="icon" href="assets/icon.png" type="image/png" />
@@ -123,12 +123,30 @@ img { max-width: 100%; height: auto; display: block; }
   box-shadow: 0 0 0 1px var(--line);
 }
 
+.nav-right { display: flex; align-items: center; gap: 16px; }
+
 .nav-link {
   font-size: 14px;
   color: var(--muted);
   transition: color 0.18s ease;
 }
 .nav-link:hover { color: var(--fg); }
+
+.lang {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.lang button {
+  appearance: none; border: 0; background: transparent; color: var(--muted);
+  font: inherit; font-size: 12.5px; padding: 4px 12px; cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+.lang button:hover { color: var(--fg); }
+.lang button[aria-pressed="true"] { background: var(--panel); color: var(--fg); }
+
+[hidden] { display: none !important; }
 
 /* ---------- 首屏：左文字 / 右预览 ---------- */
 
@@ -247,13 +265,14 @@ h1 em {
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
-/* ---------- 下载 ---------- */
+/* ---------- 能做什么 ---------- */
 
-.download {
+.features {
   padding: 56px 0 40px;
   border-top: 1px solid var(--line-soft);
 }
 
+.features h2,
 .download h2 {
   margin: 0;
   font-size: 22px;
@@ -265,6 +284,65 @@ h1 em {
   margin: 8px 0 24px;
   font-size: 13.5px;
   color: var(--faint);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.fcard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px 22px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: var(--panel);
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+.fcard:hover {
+  border-color: var(--line);
+  background: var(--panel-hi);
+  transform: translateY(-2px);
+}
+
+.fcard .ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin-bottom: 2px;
+  border: 1px solid var(--brand-line);
+  border-radius: 10px;
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+
+.fcard .ico svg { width: 17px; height: 17px; }
+
+.fcard h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.fcard p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.72;
+  color: var(--muted);
+}
+
+/* ---------- 下载 ---------- */
+
+.download {
+  padding: 56px 0 40px;
+  border-top: 1px solid var(--line-soft);
 }
 
 .platforms {
@@ -377,6 +455,12 @@ footer .row {
 footer a { color: var(--muted); }
 footer a:hover { color: var(--fg); }
 
+.disclaim {
+  margin: 14px 0 0;
+  font-size: 12px;
+  color: var(--faint);
+}
+
 /* ---------- 响应式 ---------- */
 
 @media (max-width: 940px) {
@@ -386,12 +470,18 @@ footer a:hover { color: var(--fg); }
     padding: 32px 0 56px;
   }
   .shot { order: 2; }
+  .grid { grid-template-columns: repeat(2, 1fr); }
   .platforms { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  .grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 520px) {
   .wrap { padding: 0 20px; }
   .nav { height: 64px; }
+  .nav-right { gap: 10px; }
   .actions .btn { flex: 1 1 100%; }
 }
 </style>
@@ -402,22 +492,28 @@ footer a:hover { color: var(--fg); }
 
   <header class="nav">
     <a class="brand" href="#top">
-      <img src="assets/icon.png" width="28" height="28" alt="" />
+      <img src="assets/icon.png" width="28" height="28" alt="" aria-hidden="true" />
       MHUB Lite
     </a>
-    <a class="nav-link" href="https://github.com/RedCarl/MHUB-Lite" target="_blank" rel="noopener">GitHub ↗</a>
+    <div class="nav-right">
+      <a class="nav-link" href="https://github.com/RedCarl/MHUB-Lite" target="_blank" rel="noopener">GitHub ↗</a>
+      <div class="lang" role="group" aria-label="Language / 语言">
+        <button type="button" data-set-lang="zh" aria-pressed="true">中文</button>
+        <button type="button" data-set-lang="en" aria-pressed="false">EN</button>
+      </div>
+    </div>
   </header>
 
   <main id="top">
     <section class="hero">
       <div class="copy">
-        <p class="eyebrow">Tauri 2 · Svelte 5 · Rust</p>
+        <p class="eyebrow">Tauri 2 · Svelte 5 · Rust · MIT</p>
 
-        <h1>鼠标和键盘，<br />都听<em>你的</em>。</h1>
+        <h1><span data-zh>鼠标和键盘，</span><span data-en hidden>Mice and keys,</span><br /><span data-zh>都听<em>你的</em>。</span><span data-en hidden>all <em>yours</em>.</span></h1>
 
         <p class="lede">
-          一个几 MB 的桌面设备工具。DPI、回报率、三层改键、灯效都在一个窗口里；
-          改完直接写入板载存储，不用再点应用。
+          <span data-zh>一个几 MB 的桌面设备工具。DPI、回报率、三层改键、灯效都在一个窗口里；改完直接写入板载存储，不用再点「应用」。</span>
+          <span data-en hidden>A few-megabyte desktop tool for MCHOSE gear. DPI, polling rate, three-layer remapping and lighting all live in one window — changes write straight to onboard memory, with no "Apply" step.</span>
         </p>
 
         <div class="actions">
@@ -427,7 +523,7 @@ footer a:hover { color: var(--fg); }
           </a>
           <a class="btn btn-ghost" href="https://github.com/RedCarl/MHUB-Lite" target="_blank" rel="noopener">
             <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
-            源代码
+            <span data-zh>源代码</span><span data-en hidden>Source</span>
           </a>
         </div>
 
@@ -435,43 +531,86 @@ footer a:hover { color: var(--fg); }
       </div>
 
       <figure class="shot">
-        <img src="assets/screenshot.jpg" width="1915" height="1123"
-             alt="MHUB Lite 主界面：鼠标概览与设备切换" />
+        <img src="assets/screenshot.jpg" width="1800" height="1200" id="shot"
+             alt="MHUB Lite 主界面：鼠标概览、设备切换与 DPI 档位" />
       </figure>
     </section>
 
+    <section class="features" id="features">
+      <h2><span data-zh>能做什么</span><span data-en hidden>What it does</span></h2>
+      <p class="sub"><span data-zh>插上设备就能用，改完就能走。</span><span data-en hidden>Plug in, tune it, walk away.</span></p>
+
+      <div class="grid">
+        <div class="fcard">
+          <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="5"/><path d="M12 6.5v4"/></svg></span>
+          <h3><span data-zh>鼠标</span><span data-en hidden>Mouse</span></h3>
+          <p><span data-zh>电量、充电状态、连接方式一眼看全；1–6 档 DPI 随手切，回报率、按键防抖、无线休眠都能调。支持 G3 V2 与 A7 V3 Ultra+。</span><span data-en hidden>Battery, charging state and connection at a glance. Switch between 1–6 DPI stages and tune polling rate, debounce and wireless sleep. Supports G3 V2 and A7 V3 Ultra+.</span></p>
+        </div>
+
+        <div class="fcard">
+          <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6.5 10v4M10 10v4M13.5 10v4M17 10v4"/></svg></span>
+          <h3><span data-zh>三层改键</span><span data-en hidden>Three-layer remap</span></h3>
+          <p><span data-zh>Default / Fn / Fn2 三层，99 键可视化布局。任意键可映射成其他按键、修饰键、媒体键或自定义代码；K99 V2 2.4G 已支持。</span><span data-en hidden>Default / Fn / Fn2 layers over a 99-key visual layout. Map any key to another key, a modifier, a media key or a custom code. K99 V2 2.4G is supported.</span></p>
+        </div>
+
+        <div class="fcard">
+          <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v2"/><path d="M5.6 5.6l1.4 1.4"/><path d="M18.4 5.6 17 7"/><path d="M9.5 14.5a3 3 0 1 1 5 0c-.6.8-1 1.3-1 2.5h-3c0-1.2-.4-1.7-1-2.5Z"/><path d="M10.5 20h3"/></svg></span>
+          <h3><span data-zh>灯效</span><span data-en hidden>Lighting</span></h3>
+          <p><span data-zh>模式、亮度、速度、单色 / 多彩都能调；鼠标和键盘各管各的，改完写进设备，换台电脑也还是这套。</span><span data-en hidden>Tune mode, brightness, speed and single/multi-colour lighting. Mouse and keyboard keep their own settings, stored on the device itself.</span></p>
+        </div>
+
+        <div class="fcard">
+          <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9 17.5 20 6.5"/></svg></span>
+          <h3><span data-zh>即时保存</span><span data-en hidden>Instant save</span></h3>
+          <p><span data-zh>没有「草稿 → 应用」两步。改完一两秒自动写入，侧边栏显示「保存中… / 已保存」；连续拖动滑块会合并成一次写入。</span><span data-en hidden>No draft-then-apply dance. Changes commit a second or two after you stop, the sidebar shows "Saving… / Saved", and rapid slider drags collapse into one write.</span></p>
+        </div>
+
+        <div class="fcard">
+          <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="8" height="16" rx="2"/><rect x="13" y="4" width="8" height="16" rx="2"/></svg></span>
+          <h3><span data-zh>多设备</span><span data-en hidden>Multiple devices</span></h3>
+          <p><span data-zh>鼠标和键盘可以同时连接，侧边栏顶部切换当前设备，导航跟着变；设置固定在底部，不占导航的位置。</span><span data-en hidden>Mouse and keyboard can be connected at once. Switch device from the top of the sidebar and the nav follows; settings stay pinned to the bottom.</span></p>
+        </div>
+
+        <div class="fcard">
+          <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8.5a6 6 0 1 0-12 0c0 5-2 6.5-2 6.5h16s-2-1.5-2-6.5"/><path d="M9.5 19a2.6 2.6 0 0 0 5 0"/></svg></span>
+          <h3><span data-zh>后台与低电量提醒</span><span data-en hidden>Tray and low-battery alerts</span></h3>
+          <p><span data-zh>关窗口只是收进托盘 / 菜单栏，电量继续监测：低于 20% 通知一次，充电不打扰；支持开机自启与跟随系统主题。</span><span data-en hidden>Closing the window tucks it into the tray or menu bar and monitoring keeps running: one alert below 20%, silence while charging. Launch at login and system theme included.</span></p>
+        </div>
+      </div>
+    </section>
+
     <section class="download" id="download">
-      <h2>下载</h2>
+      <h2><span data-zh>下载</span><span data-en hidden>Download</span></h2>
       <p class="sub" id="sub">安装包约 3–4 MB，新版本可在应用内直接升级。</p>
 
       <div class="platforms">
         <a class="plat" data-os="windows" data-asset="exe" href="https://github.com/RedCarl/MHUB-Lite/releases/latest" rel="noopener">
-          <span class="tag" data-rec hidden>推荐</span>
+          <span class="tag" data-rec hidden><span data-zh>推荐</span><span data-en hidden>Best</span></span>
           <span class="os">
             <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.6 10.4 4.6v6.8H3V5.6Zm0 7.4h7.4v6.8L3 18.8V13Zm9-8.7L21 3v8.4h-9V4.3Zm0 8.7h9V21l-9-1.3V13Z"/></svg>
             Windows
           </span>
-          <span class="file" data-file="exe">MHUB.Lite_x64-setup.exe</span>
+          <span class="file" data-file="exe">Windows 10 / 11 · x64</span>
           <span class="size" data-size="exe"></span>
         </a>
 
         <a class="plat" data-os="mac" data-asset="dmg-arm" href="https://github.com/RedCarl/MHUB-Lite/releases/latest" rel="noopener">
-          <span class="tag" data-rec hidden>推荐</span>
+          <span class="tag" data-rec hidden><span data-zh>推荐</span><span data-en hidden>Best</span></span>
           <span class="os">
             <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.4 12.7c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.7.8-3.4.8-.7 0-1.8-.8-3-.8-1.5 0-3 .9-3.8 2.3-1.6 2.8-.4 7 1.2 9.3.8 1.1 1.7 2.4 2.9 2.3 1.2 0 1.6-.7 3-.7s1.8.7 3 .7c1.2 0 2-1.1 2.8-2.2.9-1.3 1.3-2.5 1.3-2.6-.1 0-2.6-1-2.6-3.8ZM14.2 5.7c.6-.8 1.1-1.9 1-3-.9 0-2 .6-2.7 1.4-.6.7-1.1 1.8-1 2.9 1 .1 2-.5 2.7-1.3Z"/></svg>
-            macOS · Apple 芯片
+            <span data-zh>macOS · Apple 芯片</span><span data-en hidden>macOS · Apple silicon</span>
           </span>
-          <span class="file" data-file="dmg-arm">MHUB.Lite_aarch64.dmg</span>
+          <span class="file" data-file="dmg-arm">macOS 11+ · arm64</span>
           <span class="size" data-size="dmg-arm"></span>
         </a>
 
         <a class="plat" data-os="mac-intel" data-asset="dmg-x64" href="https://github.com/RedCarl/MHUB-Lite/releases/latest" rel="noopener">
-          <span class="tag" data-rec hidden>推荐</span>
+          <span class="tag" data-rec hidden><span data-zh>推荐</span><span data-en hidden>Best</span></span>
           <span class="os">
             <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.4 12.7c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.7.8-3.4.8-.7 0-1.8-.8-3-.8-1.5 0-3 .9-3.8 2.3-1.6 2.8-.4 7 1.2 9.3.8 1.1 1.7 2.4 2.9 2.3 1.2 0 1.6-.7 3-.7s1.8.7 3 .7c1.2 0 2-1.1 2.8-2.2.9-1.3 1.3-2.5 1.3-2.6-.1 0-2.6-1-2.6-3.8ZM14.2 5.7c.6-.8 1.1-1.9 1-3-.9 0-2 .6-2.7 1.4-.6.7-1.1 1.8-1 2.9 1 .1 2-.5 2.7-1.3Z"/></svg>
             macOS · Intel
           </span>
-          <span class="file" data-file="dmg-x64">MHUB.Lite_x64.dmg</span>
+          <span class="file" data-file="dmg-x64">macOS 11+ · x64</span>
           <span class="size" data-size="dmg-x64"></span>
         </a>
       </div>
@@ -482,8 +621,8 @@ footer a:hover { color: var(--fg); }
       </p>
 
       <p class="hint">
-        macOS 首次打开若提示「已损坏」，在 Finder 里右键 → 打开。
-        全部历史版本见 <a href="https://github.com/RedCarl/MHUB-Lite/releases" target="_blank" rel="noopener">GitHub Releases</a>。
+        <span data-zh>macOS 首次打开若提示「已损坏」，在 Finder 里右键 → 打开；Windows 若提示「未知发布者」，选择「仍要运行」。全部历史版本见</span><span data-en hidden>If macOS claims the app is "damaged" on first launch, right-click it in Finder and choose Open; if Windows warns about an unknown publisher, choose "Run anyway". Every past version is on</span>
+        <a href="https://github.com/RedCarl/MHUB-Lite/releases" target="_blank" rel="noopener">GitHub Releases</a>.
       </p>
     </section>
   </main>
@@ -491,22 +630,103 @@ footer a:hover { color: var(--fg); }
   <footer>
     <div class="row">
       <span>© 2026 MHUB Lite · MIT License</span>
-      <span>非官方工具，与 MCHOSE 没有隶属关系。产品图版权归迈从科技所有。</span>
+      <span>
+        <a href="https://github.com/RedCarl/MHUB-Lite" target="_blank" rel="noopener">GitHub</a> ·
+        <a href="https://github.com/RedCarl/MHUB-Lite/releases" target="_blank" rel="noopener">Releases</a> ·
+        <a href="https://github.com/RedCarl/MHUB-Lite/issues" target="_blank" rel="noopener"><span data-zh>问题反馈</span><span data-en hidden>Issues</span></a>
+      </span>
     </div>
+    <p class="disclaim"><span data-zh>非官方工具，与 MCHOSE 没有隶属关系；界面中的产品名称与商标归各自所有者。</span><span data-en hidden>An unofficial tool, not affiliated with MCHOSE. Product names and trademarks belong to their respective owners.</span></p>
   </footer>
 
 </div>
 
 <script>
 (function () {
-  var REPO = "RedCarl/MHUB-Lite";
-  var LATEST = "https://github.com/" + REPO + "/releases/latest";
+  var KEY = 'mhub-lang';
+  var REPO = 'RedCarl/MHUB-Lite';
+  var LATEST = 'https://github.com/' + REPO + '/releases/latest';
 
-  /* 只给 /releases/download/ 的附件直链加镜像前缀。
-     Releases 页面之类的 HTML 链接保持原样。 */
-  var MIRROR = "https://gh-proxy.com/";
-  var mode = "mirror";
+  /* 下载加速：只给 /releases/download/ 的附件直链加前缀，
+     releases 页面之类的 HTML 链接保持原样。
+     版本信息也走这里兜底：api.github.com 在国内经常被限流或很慢。 */
+  var MIRROR = 'https://gh-proxy.com/';
+
+  /* 所有由脚本写入的文案都在这里。切换语言时 apply() 关掉旧语言，
+     render() 再按当前语言把动态文本重写一遍。 */
+  var COPY = {
+    zh: {
+      title: 'MHUB Lite — 几 MB 的 MCHOSE 设备管理工具',
+      desc: 'MHUB Lite 是一个几 MB 的 MCHOSE 鼠标 / 键盘管理工具：DPI、回报率、三层改键、灯效，直接写进板载存储。基于 Tauri 2 + Svelte 5 + Rust，开源 MIT。',
+      ogTitle: 'MHUB Lite — 几 MB 的 MCHOSE 设备管理工具',
+      ogDesc: '鼠标和键盘，都在一个窗口里。',
+      shotAlt: 'MHUB Lite 主界面：鼠标概览、设备切换与 DPI 档位',
+      hero: '下载最新版本',
+      heroWin: '下载 Windows 版',
+      heroMac: '下载 macOS 版',
+      meta: function (tag) {
+        return (tag ? tag + ' · ' : '') + 'Windows 10/11 · macOS 11+ · 自动更新';
+      },
+      sub: function (tag) {
+        return tag
+          ? tag + ' · 安装包 3–4 MB，新版本可在应用内直接升级。'
+          : '安装包约 3–4 MB，新版本可在应用内直接升级。';
+      },
+      subFail: function () {
+        return '安装包约 3–4 MB。版本信息获取失败，可直接前往 Releases 下载。';
+      },
+      route: function (mirror) {
+        return mirror ? '下载经由 gh-proxy.com 镜像加速' : '下载直连 GitHub';
+      },
+      mode: function (mirror) {
+        return mirror ? '改用 GitHub 直连' : '改用镜像加速';
+      }
+    },
+    en: {
+      title: 'MHUB Lite — a few-MB MCHOSE device manager',
+      desc: 'MHUB Lite is a few-megabyte manager for MCHOSE mice and keyboards: DPI, polling rate, three-layer remapping and lighting, written straight to onboard memory. Tauri 2 + Svelte 5 + Rust, open source under MIT.',
+      ogTitle: 'MHUB Lite — a few-MB MCHOSE device manager',
+      ogDesc: 'Mouse and keyboard, all in one window.',
+      shotAlt: 'MHUB Lite main window: mouse overview, device switcher and DPI stages',
+      hero: 'Download latest',
+      heroWin: 'Download for Windows',
+      heroMac: 'Download for macOS',
+      meta: function (tag) {
+        return (tag ? tag + ' · ' : '') + 'Windows 10/11 · macOS 11+ · auto-update';
+      },
+      sub: function (tag) {
+        return tag
+          ? tag + ' · installer 3–4 MB, new versions update in place from inside the app.'
+          : 'The installer is about 3–4 MB; new versions update in place from inside the app.';
+      },
+      subFail: function () {
+        return 'The installer is about 3–4 MB. Could not load version info — grab it straight from Releases.';
+      },
+      route: function (mirror) {
+        return mirror ? 'Downloads are accelerated through the gh-proxy.com mirror' : 'Downloads go straight to GitHub';
+      },
+      mode: function (mirror) {
+        return mirror ? 'Use direct GitHub links' : 'Use the mirror';
+      }
+    }
+  };
+
+  var state = {
+    lang: 'zh',
+    mode: 'mirror',
+    guess: '',
+    tag: '',
+    failed: false,
+    heroKind: 'default'
+  };
   var links = [];
+
+  function copy() { return COPY[state.lang] || COPY.zh; }
+  function byId(id) { return document.getElementById(id); }
+  function setText(id, text) {
+    var el = byId(id);
+    if (el) el.textContent = text;
+  }
 
   function accel(url) {
     return /\/releases\/download\//.test(url) ? MIRROR + url : url;
@@ -517,35 +737,84 @@ footer a:hover { color: var(--fg); }
     for (var i = 0; i < links.length; i++) {
       if (links[i].el === el) {
         links[i].direct = url;
-        el.href = mode === "mirror" ? accel(url) : url;
+        el.href = state.mode === 'mirror' ? accel(url) : url;
         return;
       }
     }
     links.push({ el: el, direct: url });
-    el.href = mode === "mirror" ? accel(url) : url;
+    el.href = state.mode === 'mirror' ? accel(url) : url;
+  }
+
+  /* 只负责动态文本，样式/隐藏交给 apply() 与 mark()。 */
+  function render() {
+    var t = copy();
+    setText('hero-dl-label',
+      state.heroKind === 'windows' ? t.heroWin :
+      state.heroKind === 'mac' ? t.heroMac : t.hero);
+    setText('meta', t.meta(state.tag));
+    setText('sub', state.failed ? t.subFail() : t.sub(state.tag));
+    setText('dl-route', t.route(state.mode === 'mirror'));
+    setText('mode', t.mode(state.mode === 'mirror'));
+    var shot = byId('shot');
+    if (shot) shot.alt = t.shotAlt;
   }
 
   function applyMode() {
     links.forEach(function (l) {
-      l.el.href = mode === "mirror" ? accel(l.direct) : l.direct;
+      l.el.href = state.mode === 'mirror' ? accel(l.direct) : l.direct;
     });
-    var btn = document.getElementById("mode");
-    if (btn) btn.textContent = mode === "mirror" ? "改用 GitHub 直连" : "改用镜像加速";
-    var route = document.getElementById("dl-route");
-    if (route) route.textContent = mode === "mirror" ? "下载经由 gh-proxy.com 镜像加速" : "下载直连 GitHub";
+    render();
   }
 
-  var modeBtn = document.getElementById("mode");
+  function apply(lang) {
+    state.lang = lang === 'en' ? 'en' : 'zh';
+    var isEN = state.lang === 'en';
+    document.documentElement.lang = isEN ? 'en' : 'zh-CN';
+    document.querySelectorAll('[data-zh]').forEach(function (el) { el.hidden = isEN; });
+    document.querySelectorAll('[data-en]').forEach(function (el) { el.hidden = !isEN; });
+    document.querySelectorAll('[data-set-lang]').forEach(function (b) {
+      b.setAttribute('aria-pressed', String(b.getAttribute('data-set-lang') === state.lang));
+    });
+
+    var t = copy();
+    document.title = t.title;
+    var md = document.querySelector('meta[name="description"]');
+    if (md) md.setAttribute('content', t.desc);
+    var ot = document.querySelector('meta[property="og:title"]');
+    if (ot) ot.setAttribute('content', t.ogTitle);
+    var od = document.querySelector('meta[property="og:description"]');
+    if (od) od.setAttribute('content', t.ogDesc);
+
+    render();
+    mark(state.guess);
+  }
+
+  var saved = null;
+  try { saved = localStorage.getItem(KEY); } catch (e) {}
+  var initial = (saved === 'en' || saved === 'zh')
+    ? saved
+    : ((navigator.language || 'zh').toLowerCase().indexOf('zh') === 0 ? 'zh' : 'en');
+  apply(initial);
+
+  document.querySelectorAll('[data-set-lang]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var lang = b.getAttribute('data-set-lang');
+      apply(lang);
+      try { localStorage.setItem(KEY, lang); } catch (e) {}
+    });
+  });
+
+  var modeBtn = byId('mode');
   if (modeBtn) {
-    modeBtn.addEventListener("click", function () {
-      mode = mode === "mirror" ? "direct" : "mirror";
+    modeBtn.addEventListener('click', function () {
+      state.mode = state.mode === 'mirror' ? 'direct' : 'mirror';
       applyMode();
     });
   }
 
   function size(bytes) {
-    if (!bytes) return "";
-    return (bytes / 1048576).toFixed(2) + " MB";
+    if (!bytes) return '';
+    return (bytes / 1048576).toFixed(2) + ' MB';
   }
 
   function pick(assets, re) {
@@ -554,35 +823,36 @@ footer a:hover { color: var(--fg); }
   }
 
   function ua() {
-    var s = navigator.userAgent || "";
-    if (/Windows NT/i.test(s)) return "windows";
-    if (/Mac OS X|Macintosh/i.test(s) && !/iPhone|iPad/i.test(s)) return "mac";
-    return "";
+    var s = navigator.userAgent || '';
+    if (/Windows NT/i.test(s)) return 'windows';
+    if (/Mac OS X|Macintosh/i.test(s) && !/iPhone|iPad/i.test(s)) return 'mac';
+    return '';
   }
 
-  var guess = ua();
-
+  /* 先把「推荐」标到可能的系统上；拿到架构信息后再细调一次。 */
   function mark(os) {
-    document.querySelectorAll(".plat").forEach(function (el) {
+    document.querySelectorAll('.plat').forEach(function (el) {
       var hit = el.dataset.os === os;
-      el.classList.toggle("rec", hit);
-      var tag = el.querySelector("[data-rec]");
+      el.classList.toggle('rec', hit);
+      var tag = el.querySelector('[data-rec]');
       if (tag) tag.hidden = !hit;
     });
   }
-  mark(guess);
 
-  if (guess === "mac" && navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
-    navigator.userAgentData.getHighEntropyValues(["architecture"]).then(function (v) {
-      mark(v.architecture === "x86" ? "mac-intel" : "mac");
+  state.guess = ua();
+  mark(state.guess);
+
+  if (state.guess === 'mac' && navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
+    navigator.userAgentData.getHighEntropyValues(['architecture']).then(function (v) {
+      state.guess = v.architecture === 'x86' ? 'mac-intel' : 'mac';
+      mark(state.guess);
     }).catch(function () {});
   }
 
   function fill(key, asset) {
     if (!asset) return;
-    var url = asset.browser_download_url;
     document.querySelectorAll('[data-asset="' + key + '"]').forEach(function (a) {
-      bind(a, url);
+      bind(a, asset.browser_download_url);
     });
     var name = document.querySelector('[data-file="' + key + '"]');
     if (name) name.textContent = asset.name;
@@ -590,42 +860,53 @@ footer a:hover { color: var(--fg); }
     if (s) s.textContent = size(asset.size);
   }
 
-  fetch("https://api.github.com/repos/" + REPO + "/releases/latest", {
-    headers: { Accept: "application/vnd.github+json" }
-  })
-    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+  /* api.github.com 慢或限流时别让按钮一直空着：4 秒拿不到就改走镜像。 */
+  function withTimeout(promise, ms) {
+    return new Promise(function (resolve, reject) {
+      var timer = setTimeout(function () { reject(new Error('timeout')); }, ms);
+      promise.then(
+        function (value) { clearTimeout(timer); resolve(value); },
+        function (err) { clearTimeout(timer); reject(err); }
+      );
+    });
+  }
+
+  function loadRelease(base) {
+    return fetch(base + '/repos/' + REPO + '/releases/latest', {
+      headers: { Accept: 'application/vnd.github+json' }
+    }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); });
+  }
+
+  withTimeout(loadRelease('https://api.github.com'), 4000)
+    .catch(function () { return loadRelease(MIRROR + 'https://api.github.com'); })
     .then(function (rel) {
       var a = rel.assets || [];
-      var exe = pick(a, /x64-setup\.exe$/i) || pick(a, /x64_en-US\.msi$/i) || pick(a, /\.exe$/i);
+      var exe = pick(a, /x64-setup\.exe$/i) || pick(a, /\.exe$/i);
       var arm = pick(a, /aarch64\.dmg$/i);
       var intel = pick(a, /x64\.dmg$/i);
 
-      fill("exe", exe);
-      fill("dmg-arm", arm);
-      fill("dmg-x64", intel);
+      fill('exe', exe);
+      fill('dmg-arm', arm);
+      fill('dmg-x64', intel);
 
-      if (rel.tag_name) {
-        document.getElementById("meta").textContent =
-          rel.tag_name + " · Windows 10/11 · macOS 11+ · 自动更新";
-        document.getElementById("sub").textContent =
-          rel.tag_name + " · 安装包 3–4 MB，新版本可在应用内直接升级。";
+      if (rel.tag_name) state.tag = rel.tag_name;
 
-        var hero = document.getElementById("hero-dl");
-        var label = document.getElementById("hero-dl-label");
-        if (guess === "windows" && exe) {
-          bind(hero, exe.browser_download_url);
-          label.textContent = "下载 Windows 版";
-        } else if (guess === "mac" && (arm || intel)) {
-          bind(hero, (arm || intel).browser_download_url);
-          label.textContent = "下载 macOS 版";
-        } else {
-          bind(hero, rel.html_url || LATEST);
-        }
+      var hero = byId('hero-dl');
+      if (state.guess === 'windows' && exe) {
+        bind(hero, exe.browser_download_url);
+        state.heroKind = 'windows';
+      } else if (state.guess === 'mac' && (arm || intel)) {
+        bind(hero, (arm || intel).browser_download_url);
+        state.heroKind = 'mac';
+      } else if (rel.tag_name) {
+        bind(hero, rel.html_url || LATEST);
+        state.heroKind = 'default';
       }
+      render();
     })
     .catch(function () {
-      document.getElementById("sub").textContent =
-        "安装包约 3–4 MB。版本信息获取失败，可直接前往 Releases 下载。";
+      state.failed = true;
+      render();
     });
 })();
 </script>
