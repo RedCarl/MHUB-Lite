@@ -153,6 +153,7 @@ export async function scan(auto = true) {
 
     const mouseTarget = list.find((d) => d.kind === 'mouse' && d.supported) ?? null;
     const keyboardTarget = list.find((d) => d.kind === 'keyboard' && d.supported) ?? null;
+    if (!keyboardTarget) cancelKeyboardRetry();
     const keepMouse = device.mouse && list.some((d) => d.key === device.mouse?.info.key);
     const keepKeyboard =
       device.keyboard && list.some((d) => d.key === device.keyboard?.info.key);
@@ -197,9 +198,33 @@ async function connectMouse(key: string, quiet = false) {
     if (!quiet) showToast('已连接鼠标');
     return snap;
   } catch (e) {
-    setError(e, '连接鼠标失败');
+    const permission = e instanceof ApiFailure && e.code === 'permission';
+    if (!quiet || permission) setError(e, '连接鼠标失败');
     throw e;
   }
+}
+
+/** K99 这类无线键盘睡着时连接会失败；悄悄退避重试，醒来后自动接上。 */
+const KEYBOARD_RETRY_MS = 8_000;
+const KEYBOARD_RETRY_MAX = 15;
+let keyboardRetry: ReturnType<typeof setTimeout> | null = null;
+let keyboardRetryCount = 0;
+
+function cancelKeyboardRetry() {
+  if (keyboardRetry) clearTimeout(keyboardRetry);
+  keyboardRetry = null;
+  keyboardRetryCount = 0;
+}
+
+function scheduleKeyboardRetry(key: string) {
+  if (device.keyboard || keyboardRetryCount >= KEYBOARD_RETRY_MAX) return;
+  keyboardRetryCount += 1;
+  if (keyboardRetry) clearTimeout(keyboardRetry);
+  keyboardRetry = setTimeout(() => {
+    keyboardRetry = null;
+    if (device.keyboard) return;
+    void connectKeyboard(key, true).catch(() => {});
+  }, KEYBOARD_RETRY_MS);
 }
 
 async function connectKeyboard(key: string, quiet = false) {
@@ -207,10 +232,17 @@ async function connectKeyboard(key: string, quiet = false) {
     const snap = await api.connectKeyboard(key);
     device.keyboard = snap;
     if (!device.mouse) device.active = 'keyboard';
+    cancelKeyboardRetry();
     if (!quiet) showToast('已连接键盘');
     return snap;
   } catch (e) {
-    setError(e, '连接键盘失败');
+    const permission = e instanceof ApiFailure && e.code === 'permission';
+    if (!quiet || permission) {
+      setError(e, '连接键盘失败');
+    } else {
+      // 自动重连失败多半是键盘刚休眠；不打扰用户，等它醒来再试。
+      scheduleKeyboardRetry(key);
+    }
     throw e;
   }
 }
@@ -268,6 +300,7 @@ export async function pollLive() {
 }
 
 export async function disconnect(kind?: DeviceKind) {
+  cancelKeyboardRetry();
   try {
     await api.disconnect(kind);
   } catch {
