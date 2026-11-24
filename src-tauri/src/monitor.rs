@@ -53,17 +53,6 @@ impl DeviceReading {
             battery,
         }
     }
-
-    pub(crate) fn label(&self) -> String {
-        if !self.online {
-            return "已休眠".into();
-        }
-        match &self.battery {
-            Some(battery) if battery.charging => format!("{}%（充电中）", battery.percent),
-            Some(battery) => format!("{}%", battery.percent),
-            None => "电量未知".into(),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Default)]
