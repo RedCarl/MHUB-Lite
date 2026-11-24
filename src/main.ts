@@ -1,5 +1,7 @@
 import { mount } from 'svelte';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import App from './App.svelte';
+import StatusPanel from './StatusPanel.svelte';
 import './app.css';
 import { initTheme } from './lib/theme.svelte';
 
@@ -30,6 +32,21 @@ document.documentElement.dataset.chrome =
 
 initTheme();
 
-const app = mount(App, { target: document.getElementById('app')! });
+const target = document.getElementById('app')!;
+
+/** 菜单栏电量面板是第二个 WebView，用窗口 label 区分。 */
+const isStatusPanel = shell === 'tauri' && getCurrentWindow().label === 'status';
+
+if (isStatusPanel) {
+  // 面板窗口本身透明，圆角交给 StatusPanel 自己画。
+  for (const node of [document.documentElement, document.body, target]) {
+    node.style.background = 'transparent';
+  }
+  document.body.style.overflow = 'hidden';
+}
+
+const app = isStatusPanel
+  ? mount(StatusPanel, { target })
+  : mount(App, { target });
 
 export default app;

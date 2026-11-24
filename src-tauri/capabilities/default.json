@@ -3,7 +3,8 @@
   "identifier": "default",
   "description": "MHUB Lite 默认权限",
   "windows": [
-    "main"
+    "main",
+    "status"
   ],
   "permissions": [
     "core:default",

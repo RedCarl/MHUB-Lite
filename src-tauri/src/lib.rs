@@ -1,4 +1,6 @@
 mod monitor;
+#[cfg(target_os = "macos")]
+mod panel;
 mod settings;
 mod tray;
 
@@ -439,6 +441,15 @@ fn quit_app(app: AppHandle) {
     app.exit(0);
 }
 
+/// 收起菜单栏电量面板（Esc 或点面板外面时由前端调用）。
+#[tauri::command]
+fn hide_status_panel(app: AppHandle) {
+    #[cfg(target_os = "macos")]
+    panel::hide(&app);
+    #[cfg(not(target_os = "macos"))]
+    let _ = app;
+}
+
 /// 直接跳到「系统设置 → 隐私与安全性 → 输入监控」。
 ///
 /// macOS 的 HID 访问被拒时只能由用户手动授权，应用没法自己弹授权框，
@@ -500,6 +511,7 @@ pub fn run() {
             set_monitor_settings,
             test_battery_notification,
             quit_app,
+            hide_status_panel,
             open_input_monitoring
         ])
         .setup(|app| {
@@ -508,6 +520,8 @@ pub fn run() {
             let settings = store.get();
             app.manage(MonitorState::new(store));
             tray::setup(handle)?;
+            #[cfg(target_os = "macos")]
+            panel::setup(handle)?;
             tray::sync_settings(handle, &settings);
             // 应用可能被移动过，开机自启的路径需要跟着更新。
             if settings.start_at_login {
@@ -527,6 +541,20 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
+            #[cfg(target_os = "macos")]
+            if window.label() == panel::PANEL_LABEL {
+                match event {
+                    WindowEvent::Focused(true) => panel::keep_open(),
+                    WindowEvent::Focused(false) => panel::hide_soon(window.app_handle()),
+                    WindowEvent::CloseRequested { api, .. } => {
+                        api.prevent_close();
+                        let _ = window.hide();
+                    }
+                    _ => {}
+                }
+                return;
+            }
+
             if let WindowEvent::CloseRequested { api, .. } = event {
                 let app = window.app_handle();
                 if app.state::<MonitorState>().settings.get().close_to_tray {

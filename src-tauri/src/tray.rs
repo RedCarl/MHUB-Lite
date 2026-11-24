@@ -1,8 +1,7 @@
 //! 托盘 / 菜单栏图标。
 //!
-//! macOS 上是一个菜单栏图标（模板图，跟随深浅色）：点左键直接弹出电量菜单，
-//! 不打开窗口；Windows 上是任务栏通知区图标：左键打开主窗口，右键弹菜单。
-//! 菜单里的电量文字和两个勾选项会随后台读取更新。
+//! macOS 上是一个菜单栏图标（模板图，跟随深浅色）：左键弹出电量面板，
+//! 右键是设置菜单；Windows 上是任务栏通知区图标：左键打开主窗口、右键弹菜单。
 
 use crate::monitor::{DeviceReading, MonitorState, MonitorStatus};
 use crate::settings::MonitorSettings;
@@ -13,10 +12,6 @@ use tauri::{AppHandle, Manager};
 
 pub const TRAY_ID: &str = "mhub-tray";
 
-const MENU_OPEN: &str = "tray-open";
-const MENU_REFRESH: &str = "tray-refresh";
-const MENU_MOUSE: &str = "tray-mouse";
-const MENU_KEYBOARD: &str = "tray-keyboard";
 const MENU_LOW: &str = "tray-low";
 const MENU_AUTOSTART: &str = "tray-autostart";
 const MENU_QUIT: &str = "tray-quit";
@@ -25,9 +20,6 @@ const MENU_QUIT: &str = "tray-quit";
 const TRAY_ICON: Image<'static> = tauri::include_image!("icons/tray.png");
 
 pub struct TrayHandles {
-    mouse: MenuItem<tauri::Wry>,
-    keyboard: MenuItem<tauri::Wry>,
-    refresh: MenuItem<tauri::Wry>,
     low: CheckMenuItem<tauri::Wry>,
     autostart: CheckMenuItem<tauri::Wry>,
 }
@@ -35,11 +27,7 @@ pub struct TrayHandles {
 pub fn setup(app: &AppHandle) -> tauri::Result<()> {
     let settings = app.state::<MonitorState>().settings.get();
 
-    // 顺序：电量状态 → 打开 / 刷新 → 提醒开关 → 退出。
-    let mouse = MenuItem::with_id(app, MENU_MOUSE, "鼠标 · 未连接", false, None::<&str>)?;
-    let keyboard = MenuItem::with_id(app, MENU_KEYBOARD, "键盘 · 未连接", false, None::<&str>)?;
-    let open = MenuItem::with_id(app, MENU_OPEN, "打开客户端", true, None::<&str>)?;
-    let refresh = MenuItem::with_id(app, MENU_REFRESH, "立即刷新电量", true, None::<&str>)?;
+    // 右键菜单只留常驻相关的开关，电量交给面板。
     let low = CheckMenuItem::with_id(
         app,
         MENU_LOW,
@@ -57,25 +45,15 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
         None::<&str>,
     )?;
     let quit = MenuItem::with_id(app, MENU_QUIT, "退出 MHUB Lite", true, None::<&str>)?;
-    let sep1 = PredefinedMenuItem::separator(app)?;
-    let sep2 = PredefinedMenuItem::separator(app)?;
-    let sep3 = PredefinedMenuItem::separator(app)?;
+    let sep = PredefinedMenuItem::separator(app)?;
 
-    let menu = Menu::with_items(
-        app,
-        &[
-            &mouse, &keyboard, &sep1, &open, &refresh, &sep2, &low, &autostart, &sep3, &quit,
-        ],
-    )?;
+    let menu = Menu::with_items(app, &[&low, &autostart, &sep, &quit])?;
 
     let builder = TrayIconBuilder::with_id(TRAY_ID)
         .tooltip("MHUB Lite · 后台电量监测")
         .menu(&menu)
-        // macOS：左键直接弹菜单，不打扰主窗口；Windows：左键打开窗口、右键弹菜单。
-        .show_menu_on_left_click(cfg!(target_os = "macos"))
+        .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {
-            MENU_OPEN => show_main(app),
-            MENU_REFRESH => app.state::<MonitorState>().request_refresh(),
             MENU_LOW => toggle_low(app),
             MENU_AUTOSTART => toggle_autostart(app),
             MENU_QUIT => app.exit(0),
@@ -85,16 +63,17 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
             if let TrayIconEvent::Click {
                 button: MouseButton::Left,
                 button_state: MouseButtonState::Up,
+                rect,
                 ..
             } = event
             {
                 #[cfg(target_os = "macos")]
                 {
-                    // 菜单由系统弹出；顺手刷新一次，等下一次打开就是新的读数。
-                    tray.app_handle().state::<MonitorState>().request_refresh();
+                    crate::panel::toggle(tray.app_handle(), rect);
                 }
                 #[cfg(not(target_os = "macos"))]
                 {
+                    let _ = rect;
                     show_main(tray.app_handle());
                 }
             }
@@ -110,13 +89,7 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
     };
 
     builder.build(app)?;
-    app.manage(TrayHandles {
-        mouse,
-        keyboard,
-        refresh,
-        low,
-        autostart,
-    });
+    app.manage(TrayHandles { low, autostart });
     Ok(())
 }
 
@@ -128,40 +101,26 @@ pub fn show_main(app: &AppHandle) {
     }
 }
 
-/// 设置从任何入口（前端 / 托盘菜单）变化后，同步两个勾选项和电量文案。
+/// 设置从任何入口（前端 / 托盘菜单）变化后，同步两个勾选项和托盘提示。
 pub fn sync_settings(app: &AppHandle, settings: &MonitorSettings) {
     let Some(handles) = app.try_state::<TrayHandles>() else {
         return;
     };
     let _ = handles.low.set_checked(settings.notify_low);
     let _ = handles.autostart.set_checked(crate::autostart_enabled(app));
-    // 监测关掉时手动刷新没有意义，菜单项直接置灰。
-    let _ = handles.refresh.set_enabled(settings.enabled);
-    update_battery(app, &app.state::<MonitorState>().last());
+
+    if settings.enabled {
+        update_battery(app, &app.state::<MonitorState>().last());
+    } else if let Some(tray) = app.tray_by_id(TRAY_ID) {
+        let _ = tray.set_tooltip(Some("MHUB Lite · 电量监测已关闭"));
+    }
 }
 
-/// 每次后台读取后刷新托盘提示和菜单里的电量文字。
+/// 每次后台读取后刷新托盘提示；面板自己订阅 monitor-reading，不依赖这里。
 pub fn update_battery(app: &AppHandle, status: &MonitorStatus) {
-    let Some(handles) = app.try_state::<TrayHandles>() else {
-        return;
-    };
-
-    let settings = app.state::<MonitorState>().settings.get();
-    if !settings.enabled {
-        let _ = handles.mouse.set_text("电量监测已关闭");
-        let _ = handles.keyboard.set_text("电量监测已关闭");
-        if let Some(tray) = app.tray_by_id(TRAY_ID) {
-            let _ = tray.set_tooltip(Some("MHUB Lite · 电量监测已关闭"));
-        }
-        return;
-    }
-
-    let threshold = settings.low_threshold;
+    let threshold = app.state::<MonitorState>().settings.get().low_threshold;
     let mouse_text = status_line("鼠标", status.mouse.as_ref(), threshold);
     let keyboard_text = status_line("键盘", status.keyboard.as_ref(), threshold);
-
-    let _ = handles.mouse.set_text(&mouse_text);
-    let _ = handles.keyboard.set_text(&keyboard_text);
 
     if let Some(tray) = app.tray_by_id(TRAY_ID) {
         let tooltip = format!("MHUB Lite · {mouse_text} · {keyboard_text}");
@@ -169,7 +128,7 @@ pub fn update_battery(app: &AppHandle, status: &MonitorStatus) {
     }
 }
 
-/// 菜单里的一行设备状态，例如「鼠标 · 77%（充电中）」。
+/// 菜单栏提示里的一行设备状态，例如「鼠标 · 77%（充电中）」。
 ///
 /// 读不到电量、设备睡着了、或者根本没连，都要说清楚是哪一种，
 /// 不能都显示成「未连接」。

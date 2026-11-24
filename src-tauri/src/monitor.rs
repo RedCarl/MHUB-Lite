@@ -133,6 +133,14 @@ impl MonitorState {
         self.refresh.swap(false, Ordering::SeqCst)
     }
 
+    /// 用户主动打开面板时可以立刻探测一次，不必等 5 分钟。
+    pub fn request_probe(&self) {
+        *self
+            .last_probe
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
+    }
+
     /// 是否允许这次临时打开设备；顺便记录时间。
     fn take_probe(&self) -> bool {
         let mut last = self
