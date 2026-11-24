@@ -17,6 +17,9 @@
   import { prefs } from './lib/prefs.svelte';
   import { initMonitor } from './lib/monitor.svelte';
   import { checkUpdatesSilently, updateState } from './lib/update.svelte';
+  import { canOpenInputMonitoring, openInputMonitoringSettings } from './lib/permissions';
+  import { showToast } from './lib/toast.svelte';
+  import { relaunch } from '@tauri-apps/plugin-process';
   import { connectionLabel } from './lib/format';
   import Logo from './components/Logo.svelte';
   import TitleBar from './components/TitleBar.svelte';
@@ -70,6 +73,18 @@
     router.route;
     mainEl?.scrollTo({ top: 0 });
   });
+
+  const canFixPermissions = $derived(
+    canOpenInputMonitoring && device.errorCode === 'permission'
+  );
+
+  async function restartApp() {
+    try {
+      await relaunch();
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : String(e), 6000);
+    }
+  }
 
   const hasDevice = $derived(!!device.mouse || !!device.keyboard);
   $effect(() => {
@@ -247,7 +262,15 @@
           <strong>设备操作没有完成</strong>
           <span>{device.error}</span>
         </div>
-        <button class="btn small" onclick={clearError}>关闭</button>
+        {#if canFixPermissions}
+          <button class="btn small" onclick={() => void openInputMonitoringSettings()}>
+            打开系统设置
+          </button>
+          <button class="btn small ghost" onclick={() => void restartApp()}>
+            重启应用
+          </button>
+        {/if}
+        <button class="btn small ghost" onclick={clearError}>关闭</button>
       </div>
     {/if}
 

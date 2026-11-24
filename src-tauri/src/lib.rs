@@ -439,6 +439,30 @@ fn quit_app(app: AppHandle) {
     app.exit(0);
 }
 
+/// 直接跳到「系统设置 → 隐私与安全性 → 输入监控」。
+///
+/// macOS 的 HID 访问被拒时只能由用户手动授权，应用没法自己弹授权框，
+/// 所以错误提示里给一个按钮，省得用户自己一层层找。
+#[tauri::command]
+fn open_input_monitoring() -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let status = std::process::Command::new("open")
+            .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")
+            .status()
+            .map_err(|e| format!("打开系统设置失败：{e}"))?;
+        if status.success() {
+            Ok(())
+        } else {
+            Err("系统设置没有打开，请手动前往「隐私与安全性 → 输入监控」".into())
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        Err("只有 macOS 需要「输入监控」权限".into())
+    }
+}
+
 fn launched_minimized() -> bool {
     std::env::args().any(|arg| arg == "--minimized")
 }
@@ -475,7 +499,8 @@ pub fn run() {
             monitor_status,
             set_monitor_settings,
             test_battery_notification,
-            quit_app
+            quit_app,
+            open_input_monitoring
         ])
         .setup(|app| {
             let handle = app.handle();

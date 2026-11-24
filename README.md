@@ -76,7 +76,7 @@ MHUB Lite 是一个 Windows / macOS 上的 MCHOSE 设备工具。插上鼠标或
 
 - 安装包约 3–4 MB，新版本可在「设置 → 软件更新」里检查
 - macOS 首次打开若提示「已损坏」，在 Finder 里右键选择「打开」即可（安装包没有做 Apple 公证）
-- **macOS 键盘需要「输入监控」权限**：系统设置 → 隐私与安全性 → 输入监控，允许 MHUB Lite 后重启应用
+- **macOS 键盘需要「输入监控」权限**：系统设置 → 隐私与安全性 → 输入监控，允许 MHUB Lite 后重启应用；连接失败时应用里的提示条会直接给出「打开系统设置」和「重启应用」两个按钮
 - Windows 安装包没有代码签名，SmartScreen 若提示「未知发布者」，选择「仍要运行」
 - 历史版本都在 [GitHub Releases](https://github.com/RedCarl/MHUB-Lite/releases)
 
@@ -94,7 +94,7 @@ MHUB Lite 是一个 Windows / macOS 上的 MCHOSE 设备工具。插上鼠标或
 
 **键盘连不上？**
 
-先关掉 MCHOSE HUB、浏览器里的 MCHOSE 网页驱动，以及其他占用 HID 的程序。macOS 还需要在「输入监控」里允许 MHUB Lite。
+先关掉 MCHOSE HUB、浏览器里的 MCHOSE 网页驱动，以及其他占用 HID 的程序。macOS 还需要在「输入监控」里允许 MHUB Lite：连接失败时，提示条上的「打开系统设置」会直接跳到对应的权限页，授权后点「重启应用」即可。
 
 **关掉窗口后应用还在运行吗？**
 

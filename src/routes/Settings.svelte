@@ -21,6 +21,7 @@
   import { theme, setTheme, type ThemeMode } from '../lib/theme.svelte';
   import { connectionLabel, hexId, timeAgo } from '../lib/format';
   import { copyText } from '../lib/toast.svelte';
+  import { canOpenInputMonitoring, openInputMonitoringSettings } from '../lib/permissions';
   import { check } from '@tauri-apps/plugin-updater';
   import { relaunch } from '@tauri-apps/plugin-process';
   import { pendingUpdate, setPendingUpdate, updateState } from '../lib/update.svelte';
@@ -173,6 +174,20 @@
           重新扫描设备
         </button>
       </div>
+
+      {#if canOpenInputMonitoring}
+        <div class="st-row">
+          <div class="st-label">
+            输入监控权限
+            <span class="st-desc">
+              macOS 连接键盘、读取 HID 需要这个权限；勾选 MHUB Lite 后重启应用
+            </span>
+          </div>
+          <button class="st-btn" onclick={() => void openInputMonitoringSettings()}>
+            打开系统设置
+          </button>
+        </div>
+      {/if}
     </div>
   </section>
 

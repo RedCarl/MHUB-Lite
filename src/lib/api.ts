@@ -194,6 +194,10 @@ export class ApiFailure extends Error {
 
 export const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
+/** macOS 上连接键盘 / 读 HID 需要「输入监控」权限，错误提示里要能直接跳过去。 */
+export const isMacOS =
+  typeof navigator !== 'undefined' && /Mac OS X|Macintosh/i.test(navigator.userAgent);
+
 export const FACTORY_CONFIG: MouseConfig = {
   pollingHz: 250,
   stageCount: 6,
@@ -563,5 +567,8 @@ export const api = {
   },
   quitApp() {
     return call<void>('quit_app');
+  },
+  openInputMonitoringSettings() {
+    return call<void>('open_input_monitoring');
   },
 };
