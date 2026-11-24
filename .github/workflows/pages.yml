@@ -48,6 +48,11 @@ jobs:
         with:
           path: site
 
+      # upload-pages-artifact 刚 finalize 时，deploy-pages 有时还查不到 artifact，
+      # 表现为 "Found 0 artifact(s)"。等几秒再部署，避免每次都要手动重跑。
+      - name: 等待 artifact 就绪
+        run: sleep 15
+
       - name: 部署
         id: deployment
         uses: actions/deploy-pages@v4
